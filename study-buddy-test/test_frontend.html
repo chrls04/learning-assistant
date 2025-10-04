@@ -5,65 +5,115 @@
 </head>
 <body>
     <h1>Test Our Backend</h1>
-    
-    <button onclick="testHealth()">Test Health</button>
-    <button onclick="testChat()">Test Chat</button>
-    <button onclick="testPersonality()">Test Personality</button>
-        <script>
-        async function testPersonality() {
-            const response = await fetch('http://localhost:5000/api/personality', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({personality: 'wise'})  // <-- CHANGED to 'wise'
-            });
-            const data = await response.json();
-            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
-        }
-        </script>
+
+    <div>
+        <strong>Current personality:</strong> <span id="current-personality">enthusiastic</span>
+    </div>
+
+    <div style="margin-top:10px;">
+        <button onclick="testHealth()">Test Health</button>
+        <button onclick="testChat()">Test Chat</button>
+        <button onclick="testPersonalityWise()">Switch to Wise 🌿</button>
+        <button onclick="testPersonalityEnthusiastic()">Switch to Enthusiastic 🎉</button>
+        <button onclick="testPersonalityProfessional()">Switch to Professional 📚</button>
+    </div>
+
+    <div style="margin-top:20px;">
+        <label for="message">Message:</label><br>
+        <input id="message" style="width:80%;" placeholder="e.g. explain photosynthesis" />
+        <button onclick="sendMessage()">Send</button>
+    </div>
             
-    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap;"></div>
 
     <script>
+        // Client-side current personality (keeps UI in sync). Server may also store state at /api/personality.
+        let currentPersonality = 'enthusiastic';
+        document.getElementById('current-personality').textContent = currentPersonality;
+
         async function testHealth() {
             const response = await fetch('http://localhost:5000/health');
             const data = await response.json();
-            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+            document.getElementById('result').textContent = JSON.stringify(data, null, 2);
         }
 
+        // Legacy quick test — sends a fixed message including personality
         async function testChat() {
+            const payload = { message: 'Hello from test!', personality: currentPersonality };
             const response = await fetch('http://localhost:5000/api/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: 'Hello from test!'})
+                body: JSON.stringify(payload)
             });
             const data = await response.json();
-            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+            // show only the AI text
+            document.getElementById('result').textContent = data.response ?? JSON.stringify(data, null, 2);
         }
 
-        async function testPersonality() {
+        async function sendMessage() {
+            const message = document.getElementById('message').value || 'Hello';
+            const payload = { message: message, personality: currentPersonality };
+
+            try {
+                const response = await fetch('http://localhost:5000/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    let parsed;
+                    try { parsed = JSON.parse(text); } catch (e) { parsed = { error: text }; }
+                    // prefer showing AI's response field if present, otherwise show error
+                    const out = parsed.response ?? parsed.error ?? JSON.stringify(parsed, null, 2);
+                    document.getElementById('result').textContent = out;
+                    return;
+                }
+                const data = await response.json();
+                // show only the AI text
+                document.getElementById('result').textContent = data.response ?? JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById('result').textContent = String(err);
+            }
+        }
+
+        async function testPersonalityWise() {
+            await switchPersonality('wise');
+        }
+
+        async function testPersonalityEnthusiastic() {
+            await switchPersonality('enthusiastic');
+        }
+
+        async function testPersonalityProfessional() {
+            await switchPersonality('professional');
+        }
+
+        async function switchPersonality(personality) {
             try {
                 const response = await fetch('http://localhost:5000/api/personality', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({personality: 'energetic'})
+                    body: JSON.stringify({personality: personality})
                 });
 
-                // show status for easier debugging
+                // update client-side state and UI even if server doesn't persist
+                currentPersonality = personality;
+                document.getElementById('current-personality').textContent = currentPersonality;
+
                 if (!response.ok) {
                     const text = await response.text();
-                    console.error('Non-OK response', response.status, text);
                     let parsed;
                     try { parsed = JSON.parse(text); } catch (e) { parsed = {error: text}; }
-                    document.getElementById('result').innerHTML = JSON.stringify({status: response.status, body: parsed}, null, 2);
+                    document.getElementById('result').textContent = parsed.message ?? parsed.error ?? JSON.stringify(parsed, null, 2);
                     return;
                 }
 
                 const data = await response.json();
-                console.log('Personality response:', data);
-                document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+                // show only the server message about switching personalities
+                document.getElementById('result').textContent = data.message ?? JSON.stringify(data, null, 2);
             } catch (err) {
-                console.error('Fetch error', err);
-                document.getElementById('result').innerHTML = JSON.stringify({error: String(err)}, null, 2);
+                document.getElementById('result').textContent = String(err);
             }
         }
     </script>

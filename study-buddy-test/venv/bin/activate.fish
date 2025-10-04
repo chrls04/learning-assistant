@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/gordon-linux/study-buddy-backend/venv
+set -gx VIRTUAL_ENV /home/gordon-linux/learning-assistant/study-buddy-test/venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
