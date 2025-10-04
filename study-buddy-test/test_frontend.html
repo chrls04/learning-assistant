@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Backend</title>
+</head>
+<body>
+    <h1>Test Our Backend</h1>
+    
+    <button onclick="testHealth()">Test Health</button>
+    <button onclick="testChat()">Test Chat</button>
+    <button onclick="testPersonality()">Test Personality</button>
+        <script>
+        async function testPersonality() {
+            const response = await fetch('http://localhost:5000/api/personality', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({personality: 'wise'})  // <-- CHANGED to 'wise'
+            });
+            const data = await response.json();
+            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+        }
+        </script>
+            
+    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+
+    <script>
+        async function testHealth() {
+            const response = await fetch('http://localhost:5000/health');
+            const data = await response.json();
+            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+        }
+
+        async function testChat() {
+            const response = await fetch('http://localhost:5000/api/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: 'Hello from test!'})
+            });
+            const data = await response.json();
+            document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+        }
+
+        async function testPersonality() {
+            try {
+                const response = await fetch('http://localhost:5000/api/personality', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({personality: 'energetic'})
+                });
+
+                // show status for easier debugging
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Non-OK response', response.status, text);
+                    let parsed;
+                    try { parsed = JSON.parse(text); } catch (e) { parsed = {error: text}; }
+                    document.getElementById('result').innerHTML = JSON.stringify({status: response.status, body: parsed}, null, 2);
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('Personality response:', data);
+                document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+            } catch (err) {
+                console.error('Fetch error', err);
+                document.getElementById('result').innerHTML = JSON.stringify({error: String(err)}, null, 2);
+            }
+        }
+    </script>
+</body>
+</html>
