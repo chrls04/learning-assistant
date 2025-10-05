@@ -1,0 +1,39 @@
+.wrapper {
+    position: relative;
+    padding-bottom: 70px;
+    padding-top: 100px;
+    box-sizing: border-box;
+}
+.homepage-navbar-container {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    box-sizing: border-box;
+    position: fixed;      /* Stick to top */
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 25px 24px;
+    height: 100px;
+}
+.homepage-header {
+    margin: 0;
+    font-family: 'Bitcount Single Ink', sans-serif;
+    text-align: left;
+
+    font-size: 3.5em;
+}
+.homepage-nav {
+    display: flex;
+    list-style: none;
+    margin: 0 50px;
+    padding: 0;
+    padding-right: 30px;
+    font-size: 1.9em;
+}
+.homepage-nav li {
+    margin-left: 60px;
+    margin-right: 0;
+}
