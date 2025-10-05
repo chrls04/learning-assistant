@@ -6,6 +6,7 @@ import os
 import sys
 import google.generativeai as genai
 from dotenv import load_dotenv
+import speech_recognition as sr
 
 # allow importing the shared content package from project root
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -57,6 +58,34 @@ def eleven_labs_tts(text, personality_key):
     except Exception:
         return None
 
+# Speech recognition function
+def listen_to_speech():
+    """Capture voice and return text"""
+    recognizer = sr.Recognizer()
+    
+    try:
+        with sr.Microphone() as source:
+            print("\nListening...")
+            recognizer.adjust_for_ambient_noise(source, duration=0.5)
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+            
+            try:
+                text = recognizer.recognize_google(audio)
+                print(f"Captured: {text}")
+                return text
+            except sr.UnknownValueError:
+                return None
+            except sr.RequestError as e:
+                print(f"Speech recognition error: {e}")
+                return None
+                
+    except sr.WaitTimeoutError:
+        print("No speech detected - timeout")
+        return None
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
 app = Flask(__name__)
 CORS(app)
 
@@ -97,6 +126,29 @@ def map_personality_key(raw):
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"message": "✅ Backend with AI is working!", "status": "healthy"})
+
+@app.route('/api/listen', methods=['POST'])
+def capture_speech():
+    """Endpoint to capture speech via microphone"""
+    try:
+        text = listen_to_speech()
+        if text:
+            return jsonify({
+                "text": text,
+                "status": "success"
+            })
+        else:
+            return jsonify({
+                "text": "",
+                "status": "no_speech",
+                "message": "Could not understand audio or no speech detected"
+            })
+    except Exception as e:
+        return jsonify({
+            "text": "",
+            "status": "error",
+            "message": f"Error capturing speech: {str(e)}"
+        }), 500
 
 @app.route('/api/chat', methods=['POST'])
 def chat_with_ai():
@@ -171,8 +223,9 @@ def list_personalities():
     })
 
 if __name__ == '__main__':
-    print("🚀 Study Buddy Backend (content-driven personalities).")
+    print("🚀 Study Buddy Backend (content-driven personalities + Speech Recognition).")
     print("📍 Server: http://localhost:5000")
     print(f"🎭 Personalities: {', '.join(CONTENT_PERSONALITIES.keys())}")
+    print("🎤 Speech recognition enabled")
     print("🔗 Test with your HTML file!")
     app.run(debug=True, port=5000)

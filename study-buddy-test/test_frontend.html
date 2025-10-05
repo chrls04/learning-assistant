@@ -3,6 +3,33 @@
 <head>
     <title>Test Backend</title>
     <meta charset="utf-8" />
+    <style>
+        .voice-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        .voice-btn:hover {
+            background-color: #45a049;
+        }
+        .voice-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .listening {
+            background-color: #ff4444 !important;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+    </style>
 </head>
 <body>
     <h1>Test Our Backend</h1>
@@ -55,11 +82,14 @@
         <label for="message">Message / Instruction:</label><br>
         <input id="message" style="width:80%;" placeholder="e.g. explain photosynthesis" />
         <button id="btn-send">Send</button>
+        <button id="btn-voice" class="voice-btn">🎤 Voice Input</button>
     </div>
 
+    <div id="voice-status" style="margin-top:10px; color:#666; font-style:italic;"></div>
+
     <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap;"></div>
-        <button id="btn-play-audio" style="margin-top:10px; display:none;">Play AI Voice</button>
-        <audio id="ai-audio" style="display:none;" controls></audio>
+    <button id="btn-play-audio" style="margin-top:10px; display:none;">Play AI Voice</button>
+    <audio id="ai-audio" style="display:none;" controls></audio>
 
     <script>
         const API_BASE = 'http://localhost:5000';
@@ -70,6 +100,9 @@
         const educationEl = document.getElementById('education-select');
         const topicEl = document.getElementById('topic');
         const gradeEl = document.getElementById('grade');
+        const messageEl = document.getElementById('message');
+        const voiceBtn = document.getElementById('btn-voice');
+        const voiceStatus = document.getElementById('voice-status');
 
         async function loadPersonalities() {
             try {
@@ -77,7 +110,6 @@
                 const data = await res.json();
                 const list = data.available_personalities || [];
 
-                // populate select with canonical keys + friendly name
                 sel.innerHTML = '';
                 list.forEach(p => {
                     const opt = document.createElement('option');
@@ -86,7 +118,6 @@
                     sel.appendChild(opt);
                 });
 
-                // set current
                 currentPersonality = data.active_personality || (list[0] && list[0].key) || '';
                 curSpan.textContent = currentPersonality;
                 if (currentPersonality) sel.value = currentPersonality;
@@ -127,16 +158,44 @@
             }
         }
 
-            // Play audio button handler
-            document.getElementById('btn-play-audio').onclick = function() {
-                const audioEl = document.getElementById('ai-audio');
-                if (audioEl.src) {
-                    audioEl.play();
+        document.getElementById('btn-play-audio').onclick = function() {
+            const audioEl = document.getElementById('ai-audio');
+            if (audioEl.src) {
+                audioEl.play();
+            }
+        };
+
+        async function captureVoice() {
+            voiceBtn.disabled = true;
+            voiceBtn.classList.add('listening');
+            voiceStatus.textContent = '🎤 Listening... (speak now)';
+            
+            try {
+                const r = await fetch(`${API_BASE}/api/listen`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const d = await r.json();
+                
+                if (d.status === 'success' && d.text) {
+                    messageEl.value = d.text;
+                    voiceStatus.textContent = `✅ Captured: "${d.text}"`;
+                    voiceStatus.style.color = '#4CAF50';
+                } else {
+                    voiceStatus.textContent = `⚠️ ${d.message || 'No speech detected'}`;
+                    voiceStatus.style.color = '#ff9800';
                 }
-            };
+            } catch (e) {
+                voiceStatus.textContent = '❌ Error: ' + String(e);
+                voiceStatus.style.color = '#f44336';
+            } finally {
+                voiceBtn.disabled = false;
+                voiceBtn.classList.remove('listening');
+            }
+        }
 
         async function sendMessage() {
-            const message = document.getElementById('message').value || 'Hello';
+            const message = messageEl.value || 'Hello';
             const payload = {
                 message,
                 personality: currentPersonality,
@@ -150,7 +209,6 @@
                     headers:{'Content-Type':'application/json'},
                     body: JSON.stringify(payload)
                 });
-                // If backend returns non-JSON or error, try to show meaningful output
                 if (!r.ok) {
                     const text = await r.text();
                     let parsed;
@@ -160,17 +218,17 @@
                 }
                 const d = await r.json();
                 result.textContent = d.response ?? JSON.stringify(d, null, 2);
-                    // Handle audio
-                    const playBtn = document.getElementById('btn-play-audio');
-                    const audioEl = document.getElementById('ai-audio');
-                    if (d.audio_b64) {
-                        audioEl.src = `data:audio/mp3;base64,${d.audio_b64}`;
-                        playBtn.style.display = '';
-                        audioEl.style.display = '';
-                    } else {
-                        playBtn.style.display = 'none';
-                        audioEl.style.display = 'none';
-                    }
+                
+                const playBtn = document.getElementById('btn-play-audio');
+                const audioEl = document.getElementById('ai-audio');
+                if (d.audio_b64) {
+                    audioEl.src = `data:audio/mp3;base64,${d.audio_b64}`;
+                    playBtn.style.display = '';
+                    audioEl.style.display = '';
+                } else {
+                    playBtn.style.display = 'none';
+                    audioEl.style.display = 'none';
+                }
             } catch (e) {
                 result.textContent = String(e);
             }
@@ -186,7 +244,6 @@
                     body: JSON.stringify({ personality: chosen })
                 });
                 const d = await r.json();
-                // backend replies with a message and current personality (or 400)
                 currentPersonality = d.personality || chosen;
                 curSpan.textContent = currentPersonality;
                 result.textContent = d.message ?? JSON.stringify(d, null, 2);
@@ -195,13 +252,12 @@
             }
         }
 
-        // wire buttons
         document.getElementById('btn-health').addEventListener('click', testHealth);
         document.getElementById('btn-test-chat').addEventListener('click', testChat);
         document.getElementById('btn-send').addEventListener('click', sendMessage);
         document.getElementById('btn-switch').addEventListener('click', switchPersonality);
+        document.getElementById('btn-voice').addEventListener('click', captureVoice);
 
-        // initial load
         loadPersonalities();
     </script>
 </body>
