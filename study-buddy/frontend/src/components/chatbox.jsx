@@ -8,7 +8,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 // Eleven Labs configuration
 const ELEVEN_LABS_API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
 // Output character limit for chatbot responses
-const OUTPUT_CHAR_LIMIT = 500;
+const OUTPUT_CHAR_LIMIT = 700;
 
 const PERSONALITY_VOICE_IDS = {
   "friendly_tutor": "pwMBn0SsmN1220Aorv15",
@@ -16,8 +16,8 @@ const PERSONALITY_VOICE_IDS = {
   "storyteller": "BNgbHR0DNeZixGQVzloa",
   "motivator": "DGzg6RaUqxGRTHSBjfgF",
   "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
-  "pro_gamer": "nPczCjzI2devNBz1zQrb", 
-  "brainrot_buddy": "EXAVITQu4vr4xnSDxMaL",
+  "pro_gamer": "oF3F9Srlnt0plaTRGrew", 
+  "brainrot_buddy": "Ej7b8NK3jVRdCTx2U53T",
   "rhyming_rapper": "qVpGLzi5EhjW3WGVhOa9"
 };
 
