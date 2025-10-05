@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify
+import requests
+import base64
 from flask_cors import CORS
 import os
 import sys
@@ -11,12 +13,49 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # import personalities and prompt builder from content
 from content.personality_prompts import PERSONALITIES as CONTENT_PERSONALITIES, get_personality_config, build_prompt
 
-# Load environment variables
 load_dotenv()
 
-# Configure Gemini (keep original behavior; set GEMINI_API_KEY in .env)
+# Configure Gemini
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 model = genai.GenerativeModel('gemini-2.5-flash')
+
+# Eleven Labs API key
+ELEVEN_LABS_API_KEY = os.getenv('ELEVEN_LABS_API_KEY')
+
+# Eleven Labs personality-to-voice mapping
+PERSONALITY_VOICE_IDS = {
+    "friendly_tutor": "pwMBn0SsmN1220Aorv15",
+    "serious_professor": "ClF3eMOzqYc7v2G67EkD",
+    "storyteller": "BNgbHR0DNeZixGQVzloa",
+    "motivator": "DGzg6RaUqxGRTHSBjfgF",
+    "visionary_ceo": "oziFLKtaxVDHQAh7o45V"
+}
+
+# Eleven Labs TTS function
+def eleven_labs_tts(text, personality_key):
+    voice_id = PERSONALITY_VOICE_IDS.get(personality_key)
+    if not voice_id or not ELEVEN_LABS_API_KEY:
+        return None
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "xi-api-key": ELEVEN_LABS_API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "text": text,
+        "voice_settings": {},
+        "output_format": "mp3"
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code == 200:
+            audio_bytes = resp.content
+            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+            return audio_b64
+        else:
+            return None
+    except Exception:
+        return None
 
 app = Flask(__name__)
 CORS(app)
@@ -81,10 +120,15 @@ def chat_with_ai():
 
         # call Gemini
         response = model.generate_content(full_prompt)
+        response_text = response.text
+
+        # call Eleven Labs TTS
+        audio_b64 = eleven_labs_tts(response_text, active_key)
 
         return jsonify({
-            "response": response.text,
+            "response": response_text,
             "personality": active_key,
+            "audio_b64": audio_b64,
             "status": "success"
         })
 

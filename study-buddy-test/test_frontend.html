@@ -58,6 +58,8 @@
     </div>
 
     <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap;"></div>
+        <button id="btn-play-audio" style="margin-top:10px; display:none;">Play AI Voice</button>
+        <audio id="ai-audio" style="display:none;" controls></audio>
 
     <script>
         const API_BASE = 'http://localhost:5000';
@@ -125,6 +127,14 @@
             }
         }
 
+            // Play audio button handler
+            document.getElementById('btn-play-audio').onclick = function() {
+                const audioEl = document.getElementById('ai-audio');
+                if (audioEl.src) {
+                    audioEl.play();
+                }
+            };
+
         async function sendMessage() {
             const message = document.getElementById('message').value || 'Hello';
             const payload = {
@@ -150,6 +160,17 @@
                 }
                 const d = await r.json();
                 result.textContent = d.response ?? JSON.stringify(d, null, 2);
+                    // Handle audio
+                    const playBtn = document.getElementById('btn-play-audio');
+                    const audioEl = document.getElementById('ai-audio');
+                    if (d.audio_b64) {
+                        audioEl.src = `data:audio/mp3;base64,${d.audio_b64}`;
+                        playBtn.style.display = '';
+                        audioEl.style.display = '';
+                    } else {
+                        playBtn.style.display = 'none';
+                        audioEl.style.display = 'none';
+                    }
             } catch (e) {
                 result.textContent = String(e);
             }
