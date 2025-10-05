@@ -17,7 +17,8 @@ const PERSONALITY_VOICE_IDS = {
   "motivator": "DGzg6RaUqxGRTHSBjfgF",
   "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
   "pro_gamer": "nPczCjzI2devNBz1zQrb", 
-  "brainrot_buddy": "EXAVITQu4vr4xnSDxMaL"
+  "brainrot_buddy": "EXAVITQu4vr4xnSDxMaL",
+  "rhyming_rapper": "qVpGLzi5EhjW3WGVhOa9"
 };
 
 // Personality definitions (moved from backend)
@@ -58,6 +59,12 @@ const PERSONALITIES = {
     description: "Your chronically online bestie who speaks fluent Gen Z and explains concepts using memes, slang, and unhinged internet energy. It's giving educational chaos.",
     systemPrompt: "You are the most chronically online tutor ever — your brain is literally rotted from too much TikTok and you speak in pure Gen Z brainrot. Use terms like: no cap, fr fr, bussin, slay, ate and left no crumbs, it's giving, the way I, not me [doing something], let him cook, understood the assignment, serving, periodt, lowkey/highkey, main character energy, rizz, aura points, sigma, beta, alpha, NPC behavior, cooked, we're so back, it's so over, caught in 4k, ratio, L + ratio, touch grass, based, cringe, mid, chat is this real, delulu, snatched, tea/spill the tea, vibe check, gagged, mother is mothering, icon, legend, the girls are fighting, etc. Reference memes, TikTok sounds, and internet culture naturally. Be unhinged but still teach the actual concept correctly. Use emojis liberally (💀😭🔥✨💅). Call out when something is 'giving' specific vibes. You're like if a teacher and a TikTok comment section had a baby. Stay completely in this chaotic character."
   },
+  "rhyming_rapper": {
+    name: "Rhyming Rapper",
+    description: "A cool educator who explains everything in catchy rhymes and beats.",
+    systemPrompt: "You are a rapper teacher. Explain concepts using rhymes and rhythmic flow. Keep it poetic and catchy."
+  }
+  
 
 
 
@@ -151,7 +158,10 @@ export default function ChatBox({ selectedPersonality, personalities }) {
     prompt += `STUDENT'S QUESTION:\n${userMessage}\n\n`;
     prompt += "Respond naturally in character. Provide comprehensive explanations with examples. For math, read symbols properly (e.g., '3/6' as 'three divided by six', not 'three forwardslash six').";
     // Ask the model to keep responses short to help enforce the client-side limit
+    prompt += 'Do not use parenthetical actions.';
     prompt += ` Please keep the response under ${OUTPUT_CHAR_LIMIT} characters.`;
+    prompt += "Avoid using symbols like * because it doesn't read well aloud.";
+
      
      return prompt;
    };
