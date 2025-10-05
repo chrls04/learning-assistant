@@ -1,29 +1,59 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import sys
 import google.generativeai as genai
 from dotenv import load_dotenv
+
+# allow importing the shared content package from project root
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# import personalities and prompt builder from content
+from content.personality_prompts import PERSONALITIES as CONTENT_PERSONALITIES, get_personality_config, build_prompt
 
 # Load environment variables
 load_dotenv()
 
-# Configure Gemini
+# Configure Gemini (keep original behavior; set GEMINI_API_KEY in .env)
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 app = Flask(__name__)
 CORS(app)
 
-# Store active personality
-current_personality = "enthusiastic"
+# Default active personality (use one of the content keys)
+current_personality = "friendly_tutor"
 
-# Personality system
-PERSONALITIES = {
-    "enthusiastic": "You are an SUPER energetic study buddy! Use lots of excitement, emojis, and encouragement! 🎉",
-    "professional": "You are a serious, professional tutor. Be clear, precise, and focused on learning.",
-    "funny": "You are a hilarious study companion! Use humor, jokes, and make learning fun!",
-    "wise": "You are a wise, patient mentor. Speak calmly and share deep insights."
+# Backwards-compatible alias mapping (maps old/simple names to new content keys)
+ALIASES = {
+    'energetic': 'friendly_tutor',
+    'enthusiastic': 'friendly_tutor',
+    'friendly': 'friendly_tutor',
+
+    'professional': 'serious_professor',
+    'pro': 'serious_professor',
+    'serious': 'serious_professor',
+    'professor': 'serious_professor',
+
+    'storyteller': 'storyteller',
+    'creative': 'storyteller',
+    'funny': 'storyteller',
+
+    'motivator': 'motivator',
+    'coach': 'motivator',
+
+    'visionary': 'visionary_ceo',
+    'ceo': 'visionary_ceo',
+
+    # map some legacy keys
+    'wise': 'serious_professor'
 }
+
+def map_personality_key(raw):
+    if raw is None:
+        return None
+    key = str(raw).strip().lower()
+    return ALIASES.get(key, key)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -32,60 +62,47 @@ def health_check():
 @app.route('/api/chat', methods=['POST'])
 def chat_with_ai():
     try:
-        data = request.json
+        data = request.json or {}
         user_message = data.get('message', 'Hello!')
-        
-        # Get the current personality prompt
-        personality_prompt = PERSONALITIES.get(current_personality, PERSONALITIES["enthusiastic"])
-        
-        # Create the full prompt
-        full_prompt = f"""
-        {personality_prompt}
-        
-        User: {user_message}
-        
-        Respond in character as their study companion:
-        """
-        
-        # Get AI response
+
+        # per-request override (frontend can pass personality)
+        requested = map_personality_key(data.get('personality'))
+        active_key = requested if (requested and requested in CONTENT_PERSONALITIES) else current_personality
+
+        # build the model prompt using shared content builder
+        full_prompt = build_prompt(
+            user_message=user_message,
+            personality_name=active_key,
+            topic=data.get('topic'),
+            education=data.get('education'),
+            grade=data.get('grade'),
+            prior_context=data.get('prior_context')
+        )
+
+        # call Gemini
         response = model.generate_content(full_prompt)
-        
+
         return jsonify({
             "response": response.text,
-            "personality": current_personality,
+            "personality": active_key,
             "status": "success"
         })
-    
+
     except Exception as e:
         return jsonify({
             "response": f"Sorry, AI is taking a break: {str(e)}",
-            "personality": current_personality, 
+            "personality": current_personality,
             "status": "error"
-        })
+        }), 500
 
 @app.route('/api/personality', methods=['POST'])
 def switch_personality():
     global current_personality
     data = request.json or {}
-    # Accept case-insensitive input and a few common synonyms
-    raw = data.get('personality', 'enthusiastic')
-    new_personality = str(raw).strip().lower()
+    raw = data.get('personality', 'friendly_tutor')
+    mapped = map_personality_key(raw)
 
-    # map synonyms to canonical personality keys
-    ALIASES = {
-        'energetic': 'enthusiastic',
-        'enthusiastic': 'enthusiastic',
-        'professional': 'professional',
-        'pro': 'professional',
-        'funny': 'funny',
-        'humorous': 'funny',
-        'wise': 'wise',
-        'sage': 'wise'
-    }
-
-    mapped = ALIASES.get(new_personality, new_personality)
-
-    if mapped in PERSONALITIES:
+    if mapped in CONTENT_PERSONALITIES:
         current_personality = mapped
         return jsonify({
             "message": f"🎭 Switched to {mapped} mode!",
@@ -93,20 +110,25 @@ def switch_personality():
         })
     else:
         return jsonify({
-            "message": f"❌ Personality '{raw}' not found. Available: {', '.join(PERSONALITIES.keys())}",
+            "message": f"❌ Personality '{raw}' not found. Available: {', '.join(CONTENT_PERSONALITIES.keys())}",
             "personality": current_personality
         }), 400
 
 @app.route('/api/personalities', methods=['GET'])
 def list_personalities():
+    # expose key, name and description for each persona
+    available = [
+        {"key": k, "name": v.get("name"), "description": v.get("description")}
+        for k, v in CONTENT_PERSONALITIES.items()
+    ]
     return jsonify({
-        "available_personalities": list(PERSONALITIES.keys()),
+        "available_personalities": available,
         "active_personality": current_personality
     })
 
 if __name__ == '__main__':
-    print("🚀 Study Buddy Backend with REAL AI!")
+    print("🚀 Study Buddy Backend (content-driven personalities).")
     print("📍 Server: http://localhost:5000")
-    print("🎭 Personalities: enthusiastic, professional, funny, wise")
+    print(f"🎭 Personalities: {', '.join(CONTENT_PERSONALITIES.keys())}")
     print("🔗 Test with your HTML file!")
     app.run(debug=True, port=5000)
