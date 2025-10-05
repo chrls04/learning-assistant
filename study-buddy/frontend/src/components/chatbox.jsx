@@ -76,50 +76,30 @@ export default function ChatBox({ selectedPersonality }) {
   const buildPrompt = (userMessage) => {
     const personality = getPersonality(selectedPersonality);
     
-    let prompt = `ROLE AND PERSONA:\n${personality.systemPrompt}\n\n`;
+    // Simplified, more concise prompt
+    let prompt = `${personality.systemPrompt}\n\n`;
     
-    if (profile.topic || profile.education || profile.grade) {
-      prompt += "LEARNER CONTEXT:\n";
-      if (profile.topic) prompt += `Learning Topic: ${profile.topic}\n`;
-      if (profile.education) prompt += `Education Level: ${profile.education}\n`;
-      if (profile.grade) prompt += `Grade/Academic Level: ${profile.grade}\n`;
-      prompt += "\n";
+    // Critical formatting rule for TTS
+    prompt += "IMPORTANT: Use plain text only. No asterisks, no markdown, no special formatting symbols. Write naturally as if speaking aloud.\n\n";
+    
+    // Only add context if it exists
+    if (profile.topic || profile.education) {
+      prompt += `Context: `;
+      if (profile.topic) prompt += `Topic: ${profile.topic}. `;
+      if (profile.education) prompt += `Level: ${profile.education}. `;
+      prompt += "\n\n";
     }
     
+    // Only recent history (last 2 messages instead of 4)
     if (chatHistory.length > 0) {
-      prompt += "CONVERSATION HISTORY:\n";
-      chatHistory.slice(-4).forEach(msg => {
+      const recentHistory = chatHistory.slice(-2);
+      recentHistory.forEach(msg => {
         prompt += `${msg.role === 'user' ? 'Student' : 'You'}: ${msg.content}\n`;
       });
       prompt += "\n";
     }
     
-    prompt += `STUDENT'S QUESTION:\n${userMessage}\n\n`;
-    
-    // Add response format instructions
-    prompt += `RESPONSE REQUIREMENTS:\n${personality.responseFormat}\n\n`;
-    
-    // Additional universal requirements
-    prompt += "ADDITIONAL INSTRUCTIONS:\n";
-    prompt += "- Provide comprehensive, thorough explanations that fully address the question\n";
-    prompt += "- Include multiple examples (2-3) that illustrate different aspects of the concept\n";
-    prompt += "- For any problem-solving: provide detailed step-by-step solutions with explanations for each step\n";
-    prompt += "- Use your personality's unique style consistently throughout the response\n";
-    prompt += "- Ensure answers are accurate, educational, and age-appropriate\n";
-    prompt += "- If including quizzes or exercises, provide complete solutions and explanations\n";
-    prompt += "- Make learning engaging while maintaining educational integrity\n\n";
-    
-    // Critical math and arithmetic reading instructions
-    prompt += "**READ ARITHMETIC PROPERLY**: When reading mathematical expressions:\n";
-    prompt += "- Say '3 divided by 6' NOT '3 forwardslash 6'\n";
-    prompt += "- Say '5 times 2' or '5 multiplied by 2' NOT '5 star 2'\n";
-    prompt += "- Say '2 plus 3' NOT '2 plus sign 3'\n";
-    prompt += "- Say '8 minus 4' NOT '8 dash 4'\n";
-    prompt += "- Say 'x squared' NOT 'x caret 2'\n";
-    prompt += "- Say 'the square root of 16' NOT 'sqrt 16'\n";
-    prompt += "- Always read mathematical symbols using proper mathematical terms\n";
-    prompt += "- Write fractions as '1/2' but say 'one half' or '1 divided by 2'\n";
-    prompt += "- Write equations clearly but describe them using proper mathematical language\n";
+    prompt += `Student: ${userMessage}\n\nYou:`;
     
     return prompt;
   };
@@ -130,13 +110,36 @@ export default function ChatBox({ selectedPersonality }) {
       return null;
     }
     
+    if (!autoPlayAudio) {
+      console.log('Audio generation skipped - toggle is OFF');
+      return null;
+    }
+    
     const voiceId = PERSONALITY_VOICE_IDS[selectedPersonality];
     if (!voiceId) {
       console.warn(`No voice ID found for personality: ${selectedPersonality}`);
       return null;
     }
 
-    console.log('Generating audio for text length:', text.length);
+    // Clean text for TTS - remove markdown and special characters
+    let cleanText = text
+      .replace(/\*\*/g, '') // Remove bold markers
+      .replace(/\*/g, '')   // Remove asterisks
+      .replace(/\_\_/g, '') // Remove underline markers
+      .replace(/\_/g, '')   // Remove underscores
+      .replace(/\#/g, '')   // Remove hashtags/headers
+      .replace(/\`\`\`/g, '') // Remove code blocks
+      .replace(/\`/g, '')   // Remove inline code
+      .replace(/\[/g, '')   // Remove brackets
+      .replace(/\]/g, '')
+      .replace(/\(/g, '')   // Remove parentheses that might be links
+      .replace(/\)/g, '');
+    
+    // Limit text length to save credits (roughly 1000 characters = 1000 credits)
+    const maxChars = 1000;
+    const textToConvert = cleanText.length > maxChars ? cleanText.substring(0, maxChars) + '...' : cleanText;
+    
+    console.log('Generating audio for text length:', textToConvert.length);
     
     try {
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -146,7 +149,7 @@ export default function ChatBox({ selectedPersonality }) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          text: text,
+          text: textToConvert,
           voice_settings: {},
           model_id: "eleven_monolingual_v1",
           output_format: "mp3_44100_128"
@@ -161,6 +164,12 @@ export default function ChatBox({ selectedPersonality }) {
       } else {
         const errorText = await response.text();
         console.error('Eleven Labs API error:', response.status, errorText);
+        
+        // If quota exceeded, automatically turn off audio
+        if (errorText.includes('quota_exceeded')) {
+          setAutoPlayAudio(false);
+          alert('Eleven Labs credits exhausted. Audio has been disabled. You can continue chatting without audio.');
+        }
         return null;
       }
     } catch (error) {
@@ -195,7 +204,7 @@ export default function ChatBox({ selectedPersonality }) {
 
       console.log('Audio URL:', audioUrl ? 'Generated' : 'Not generated');
 
-      if (audioUrl && audioRef.current && autoPlayAudio) {
+      if (audioUrl && audioRef.current) {
         audioRef.current.src = audioUrl;
         audioRef.current.onplay = () => setIsPlayingAudio(true);
         audioRef.current.onended = () => setIsPlayingAudio(false);
