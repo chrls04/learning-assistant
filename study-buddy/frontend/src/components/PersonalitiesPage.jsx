@@ -1,24 +1,43 @@
 import React, { useState } from "react";
 import ChatBox from "./chatbox.jsx";
 
-// Mock personalities list
+// Personality definitions (no backend needed)
 const personalities = [
-  { id: 1, name: "Curious Cat", description: "Always asks questions" },
-  { id: 2, name: "Helpful Owl", description: "Gives guidance" },
-  { id: 3, name: "Friendly Dog", description: "Encourages learning" },
-  { id: 4, name: "Serious Fox", description: "Focused and precise" },
-  { id: 5, name: "Creative Rabbit", description: "Explores new ideas" },
+  { 
+    key: "friendly_tutor",
+    name: "Friendly Tutor", 
+    description: "A bubbly, patient teacher who explains with real-life mini examples and emojis. Ideal for Grades 4–8." 
+  },
+  { 
+    key: "serious_professor",
+    name: "Serious Professor", 
+    description: "A calm, precise educator with academic tone; uses structure, logic, and brief examples. Ideal for high-school or university." 
+  },
+  { 
+    key: "storyteller",
+    name: "Storyteller", 
+    description: "A creative explainer who turns lessons into tiny imaginative stories or metaphors that stick." 
+  },
+  { 
+    key: "motivator",
+    name: "Coach Commander", 
+    description: "A bold, high-energy commander who motivates learners with military-level focus and discipline." 
+  },
+  { 
+    key: "visionary_ceo",
+    name: "Visionary CEO", 
+    description: "A strategic, forward-thinking leader who connects learning to real-world innovation, leadership, and impact." 
+  },
 ];
 
 export default function PersonalitiesPage() {
   const [selectedPersonality, setSelectedPersonality] = useState(null);
 
-  const handleCardClick = (id) => {
-    if (selectedPersonality === id) {
-      // Deselect if clicked again
+  const handleCardClick = (key) => {
+    if (selectedPersonality === key) {
       setSelectedPersonality(null);
     } else {
-      setSelectedPersonality(id);
+      setSelectedPersonality(key);
     }
   };
 
@@ -29,11 +48,11 @@ export default function PersonalitiesPage() {
         <h2 className="text-2xl font-bold mb-4">Personalities</h2>
         {personalities.map((p) => (
           <div
-            key={p.id}
+            key={p.key}
             className={`p-4 rounded-lg border border-white/20 cursor-pointer hover:bg-white hover:text-black transition-all ${
-              selectedPersonality === p.id ? "bg-white text-black" : ""
+              selectedPersonality === p.key ? "bg-white text-black" : ""
             }`}
-            onClick={() => handleCardClick(p.id)}
+            onClick={() => handleCardClick(p.key)}
           >
             <h3 className="font-semibold text-lg">{p.name}</h3>
             <p className="text-sm opacity-80">{p.description}</p>
@@ -49,7 +68,12 @@ export default function PersonalitiesPage() {
           </p>
         )}
 
-        {selectedPersonality && <ChatBox />}
+        {selectedPersonality && (
+          <ChatBox 
+            selectedPersonality={selectedPersonality}
+            personalities={personalities}
+          />
+        )}
       </main>
     </div>
   );
