@@ -238,17 +238,19 @@ export default function ChatBox({ selectedPersonality, personalities }) {
   return (
     <div style={{ 
       width: "100%", 
-      height: "100vh", 
+      height: "100%", 
       display: "flex", 
       flexDirection: "column",
-      position: "relative"
+      position: "relative",
+      overflow: "hidden"
     }}>
       {/* Chat Header */}
       <div style={{
         padding: "20px",
         borderBottom: "1px solid #e0e0e0",
         backgroundColor: "#f9f9f9",
-        textAlign: "center"
+        textAlign: "center",
+        flexShrink: 0
       }}>
         <h2 style={{ margin: 0, color: "#000" }}>
           Chatting with: {getPersonalityName()}
@@ -266,11 +268,13 @@ export default function ChatBox({ selectedPersonality, personalities }) {
         style={{
           flex: 1,
           overflowY: "auto",
+          overflowX: "hidden",
           padding: "20px",
           display: "flex",
           flexDirection: "column",
           gap: "15px",
-          backgroundColor: "#fff"
+          backgroundColor: "#fff",
+          minHeight: 0
         }}
       >
         {chatHistory.length === 0 && (
