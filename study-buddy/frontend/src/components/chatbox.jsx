@@ -8,7 +8,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 // Eleven Labs configuration
 const ELEVEN_LABS_API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
 // Output character limit for chatbot responses
-const OUTPUT_CHAR_LIMIT = 500;
+const OUTPUT_CHAR_LIMIT = 700;
 
 const PERSONALITY_VOICE_IDS = {
   "friendly_tutor": "pwMBn0SsmN1220Aorv15",
