@@ -1,21 +1,71 @@
 import { useRef, useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { useUserProfile } from "../context/UserProfileContext";
-import { PERSONALITIES, PERSONALITY_VOICE_IDS, getPersonality } from "../config/personalities";
 
-// Initialize Gemini - with error checking
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+// Eleven Labs configuration
 const ELEVEN_LABS_API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
+// Output character limit for chatbot responses
+const OUTPUT_CHAR_LIMIT = 500;
 
-if (!GEMINI_KEY || GEMINI_KEY === 'undefined') {
-  console.error('⚠️ GEMINI API KEY IS MISSING! Check your .env file');
-}
+const PERSONALITY_VOICE_IDS = {
+  "friendly_tutor": "pwMBn0SsmN1220Aorv15",
+  "serious_professor": "ClF3eMOzqYc7v2G67EkD",
+  "storyteller": "BNgbHR0DNeZixGQVzloa",
+  "motivator": "DGzg6RaUqxGRTHSBjfgF",
+  "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
+  "pro_gamer": "nPczCjzI2devNBz1zQrb", 
+  "brainrot_buddy": "EXAVITQu4vr4xnSDxMaL"
+};
 
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+// Personality definitions (moved from backend)
+const PERSONALITIES = {
+  "friendly_tutor": {
+    name: "Friendly Tutor",
+    description: "A bubbly, patient teacher who explains with real-life mini examples and emojis.",
+    systemPrompt: "You are a cheerful and approachable tutor who helps younger students understand tricky topics. Explain with warmth, humor, and tiny real-life examples (like pizza slices, video games, or school life). Use clear everyday language and add emojis to keep it fun."
+  },
+  "serious_professor": {
+    name: "Serious Professor",
+    description: "A calm, precise educator with academic tone; uses structure, logic, and brief examples.",
+    systemPrompt: "You are a highly knowledgeable professor who values clarity, logic, and academic rigor. Provide structured, step-by-step explanations, use correct terminology, and cite examples or formulas that show real conceptual depth."
+  },
+  "storyteller": {
+    name: "Storyteller",
+    description: "A creative explainer who turns lessons into tiny imaginative stories or metaphors.",
+    systemPrompt: "You are a captivating storyteller who teaches through imagination. Every explanation should feel like a short, vivid story or scene that sneaks in the concept naturally."
+  },
+  "motivator": {
+    name: "Coach Commander",
+    description: "A bold, high-energy commander who motivates learners with military-level focus.",
+    systemPrompt: "You are a tough but encouraging commander leading a learning squad. Speak with energy, confidence, and authority. Push learners to stay disciplined, focused, and resilient. End every response with a short motivational quote."
+  },
+  "visionary_ceo": {
+    name: "Visionary CEO",
+    description: "A strategic, forward-thinking leader who connects learning to real-world innovation.",
+    systemPrompt: "You are a visionary CEO mentoring a young professional. Use leadership and innovation language. Draw connections between topics and how they matter in careers, innovation, and growth."
+  },
+  "pro_gamer": {
+  name: "Pro Gamer",
+  description: "A gaming legend who teaches concepts using gaming terminology, strategies, and epic quest vibes. Perfect for gamers who want to level up their knowledge.",
+  systemPrompt: "You are a legendary pro gamer and streaming personality who makes learning feel like an epic gaming quest. Use gaming terminology naturally throughout your explanations (XP, grinding, boss battles, skill trees, meta, buffs, debuffs, farming, clutch plays, combos, etc.). Frame concepts as game mechanics, challenges, or quests that need to be conquered. Keep the energy high and competitive but supportive — like a pro player coaching their teammate. Use references to popular games when helpful (Minecraft, Fortnite, League, Valorant, Dark Souls, etc.) but stay educational. Celebrate progress like achieving a new rank or unlocking an achievement. Stay completely in character as the Pro Gamer throughout your response."
+  },
 
-export default function ChatBox({ selectedPersonality }) {
-  const { profile } = useUserProfile();
+  "brainrot_buddy": {
+    name: "Brainrot Buddy",
+    description: "Your chronically online bestie who speaks fluent Gen Z and explains concepts using memes, slang, and unhinged internet energy. It's giving educational chaos.",
+    systemPrompt: "You are the most chronically online tutor ever — your brain is literally rotted from too much TikTok and you speak in pure Gen Z brainrot. Use terms like: no cap, fr fr, bussin, slay, ate and left no crumbs, it's giving, the way I, not me [doing something], let him cook, understood the assignment, serving, periodt, lowkey/highkey, main character energy, rizz, aura points, sigma, beta, alpha, NPC behavior, cooked, we're so back, it's so over, caught in 4k, ratio, L + ratio, touch grass, based, cringe, mid, chat is this real, delulu, snatched, tea/spill the tea, vibe check, gagged, mother is mothering, icon, legend, the girls are fighting, etc. Reference memes, TikTok sounds, and internet culture naturally. Be unhinged but still teach the actual concept correctly. Use emojis liberally (💀😭🔥✨💅). Call out when something is 'giving' specific vibes. You're like if a teacher and a TikTok comment section had a baby. Stay completely in this chaotic character."
+  },
+
+
+
+};
+
+
+
+export default function ChatBox({ selectedPersonality, personalities }) {
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
   const audioRef = useRef(null);
@@ -25,8 +75,12 @@ export default function ChatBox({ selectedPersonality }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [autoPlayAudio, setAutoPlayAudio] = useState(true); // Toggle for auto-play
+  const [autoPlayAudio, setAutoPlayAudio] = useState(true); // NEW: toggle whether audio auto-plays after generation
+
+  // Get user profile from localStorage
+  const topic = localStorage.getItem("sb_topic") || "";
+  const education = localStorage.getItem("sb_education") || "";
+  const grade = localStorage.getItem("sb_grade") || "";
 
   // Initialize speech recognition
   useEffect(() => {
@@ -74,73 +128,40 @@ export default function ChatBox({ selectedPersonality }) {
   };
 
   const buildPrompt = (userMessage) => {
-    const personality = getPersonality(selectedPersonality);
+    const personality = PERSONALITIES[selectedPersonality] || PERSONALITIES["friendly_tutor"];
     
-    // Simplified, more concise prompt
-    let prompt = `${personality.systemPrompt}\n\n`;
+    let prompt = `ROLE AND PERSONA:\n${personality.systemPrompt}\n\n`;
     
-    // Critical formatting rule for TTS
-    prompt += "IMPORTANT: Use plain text only. No asterisks, no markdown, no special formatting symbols. Write naturally as if speaking aloud.\n\n";
-    
-    // Only add context if it exists
-    if (profile.topic || profile.education) {
-      prompt += `Context: `;
-      if (profile.topic) prompt += `Topic: ${profile.topic}. `;
-      if (profile.education) prompt += `Level: ${profile.education}. `;
-      prompt += "\n\n";
+    if (topic || education || grade) {
+      prompt += "LEARNER CONTEXT:\n";
+      if (topic) prompt += `Learning Topic: ${topic}\n`;
+      if (education) prompt += `Education Level: ${education}\n`;
+      if (grade) prompt += `Grade/Academic Level: ${grade}\n`;
+      prompt += "\n";
     }
     
-    // Only recent history (last 2 messages instead of 4)
     if (chatHistory.length > 0) {
-      const recentHistory = chatHistory.slice(-2);
-      recentHistory.forEach(msg => {
+      prompt += "CONVERSATION HISTORY:\n";
+      chatHistory.slice(-4).forEach(msg => {
         prompt += `${msg.role === 'user' ? 'Student' : 'You'}: ${msg.content}\n`;
       });
       prompt += "\n";
     }
     
-    prompt += `Student: ${userMessage}\n\nYou:`;
-    
-    return prompt;
-  };
+    prompt += `STUDENT'S QUESTION:\n${userMessage}\n\n`;
+    prompt += "Respond naturally in character. Provide comprehensive explanations with examples. For math, read symbols properly (e.g., '3/6' as 'three divided by six', not 'three forwardslash six').";
+    // Ask the model to keep responses short to help enforce the client-side limit
+    prompt += ` Please keep the response under ${OUTPUT_CHAR_LIMIT} characters.`;
+     
+     return prompt;
+   };
 
   const generateAudio = async (text) => {
-    if (!ELEVEN_LABS_API_KEY) {
-      console.warn('Eleven Labs API key not found - skipping audio generation');
-      return null;
-    }
-    
-    if (!autoPlayAudio) {
-      console.log('Audio generation skipped - toggle is OFF');
-      return null;
-    }
+    if (!ELEVEN_LABS_API_KEY) return null;
     
     const voiceId = PERSONALITY_VOICE_IDS[selectedPersonality];
-    if (!voiceId) {
-      console.warn(`No voice ID found for personality: ${selectedPersonality}`);
-      return null;
-    }
+    if (!voiceId) return null;
 
-    // Clean text for TTS - remove markdown and special characters
-    let cleanText = text
-      .replace(/\*\*/g, '') // Remove bold markers
-      .replace(/\*/g, '')   // Remove asterisks
-      .replace(/\_\_/g, '') // Remove underline markers
-      .replace(/\_/g, '')   // Remove underscores
-      .replace(/\#/g, '')   // Remove hashtags/headers
-      .replace(/\`\`\`/g, '') // Remove code blocks
-      .replace(/\`/g, '')   // Remove inline code
-      .replace(/\[/g, '')   // Remove brackets
-      .replace(/\]/g, '')
-      .replace(/\(/g, '')   // Remove parentheses that might be links
-      .replace(/\)/g, '');
-    
-    // Limit text length to save credits (roughly 1000 characters = 1000 credits)
-    const maxChars = 1000;
-    const textToConvert = cleanText.length > maxChars ? cleanText.substring(0, maxChars) + '...' : cleanText;
-    
-    console.log('Generating audio for text length:', textToConvert.length);
-    
     try {
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: "POST",
@@ -149,33 +170,20 @@ export default function ChatBox({ selectedPersonality }) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          text: textToConvert,
+          text: text,
           voice_settings: {},
-          model_id: "eleven_monolingual_v1",
           output_format: "mp3_44100_128"
         })
       });
 
       if (response.ok) {
         const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        console.log('Audio generated successfully');
-        return audioUrl;
-      } else {
-        const errorText = await response.text();
-        console.error('Eleven Labs API error:', response.status, errorText);
-        
-        // If quota exceeded, automatically turn off audio
-        if (errorText.includes('quota_exceeded')) {
-          setAutoPlayAudio(false);
-          alert('Eleven Labs credits exhausted. Audio has been disabled. You can continue chatting without audio.');
-        }
-        return null;
+        return URL.createObjectURL(audioBlob);
       }
     } catch (error) {
       console.error("Audio generation error:", error);
-      return null;
     }
+    return null;
   };
 
   const handleSubmit = async () => {
@@ -185,31 +193,39 @@ export default function ChatBox({ selectedPersonality }) {
     setMessage("");
     textareaRef.current.style.height = "auto";
 
+    // Add user message to chat
     setChatHistory(prev => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
     try {
+      // Build prompt with personality and context
       const prompt = buildPrompt(userMessage);
+
+      // Call Gemini API
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const aiResponse = response.text();
+      // Enforce client-side output length limit and mark truncation if needed
+      const truncatedResponse = aiResponse.length > OUTPUT_CHAR_LIMIT
+        ? aiResponse.slice(0, OUTPUT_CHAR_LIMIT) + "..."
+        : aiResponse;
 
-      const audioUrl = await generateAudio(aiResponse);
+      // Generate audio (use truncated text so TTS matches displayed text)
+      const audioUrl = await generateAudio(truncatedResponse);
 
+      // Add AI response to chat (store truncated version)
       setChatHistory(prev => [...prev, { 
         role: "assistant", 
-        content: aiResponse,
+        content: truncatedResponse,
         audioUrl: audioUrl
       }]);
 
-      console.log('Audio URL:', audioUrl ? 'Generated' : 'Not generated');
-
+      // Auto-play audio if available
       if (audioUrl && audioRef.current) {
         audioRef.current.src = audioUrl;
-        audioRef.current.onplay = () => setIsPlayingAudio(true);
-        audioRef.current.onended = () => setIsPlayingAudio(false);
-        audioRef.current.onpause = () => setIsPlayingAudio(false);
-        audioRef.current.play().catch(err => console.error("Audio playback error:", err));
+        if (autoPlayAudio) {
+          audioRef.current.play().catch(err => console.error("Audio playback error:", err));
+        }
       }
 
     } catch (error) {
@@ -245,74 +261,58 @@ export default function ChatBox({ selectedPersonality }) {
   };
 
   const getPersonalityName = () => {
-    return getPersonality(selectedPersonality).name;
-  };
-
-  const handlePlayLatestAudio = () => {
-    const latestMessageWithAudio = [...chatHistory].reverse().find(msg => msg.audioUrl);
-    if (latestMessageWithAudio && audioRef.current) {
-      audioRef.current.src = latestMessageWithAudio.audioUrl;
-      audioRef.current.play();
-    }
-  };
-
-  const handleStopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    return PERSONALITIES[selectedPersonality]?.name || selectedPersonality;
   };
 
   return (
-    <div className="w-full h-screen flex flex-col">
+    <div style={{ 
+      width: "100%", 
+      height: "100%", 
+      display: "flex", 
+      flexDirection: "column",
+      position: "relative",
+      overflow: "hidden"
+    }}>
       {/* Chat Header */}
-      <div className="p-5 border-b border-gray-200 bg-gray-50 text-center ml-64">
-        <h2 className="text-xl font-semibold text-black m-0">
+      <div style={{
+        padding: "20px",
+        borderBottom: "1px solid #e0e0e0",
+        backgroundColor: "#f9f9f9",
+        textAlign: "center",
+        flexShrink: 0
+      }}>
+        <h2 style={{ margin: 0, color: "#000" }}>
           Chatting with: {getPersonalityName()}
         </h2>
-        {profile.topic && (
-          <p className="mt-1 text-gray-600 text-sm">
-            Topic: {profile.topic} 
-            {profile.education && ` • ${profile.education}`} 
-            {profile.grade && ` • Grade ${profile.grade}`}
+        {topic && (
+          <p style={{ margin: "5px 0 0 0", color: "#666", fontSize: "0.9em" }}>
+            Topic: {topic} {education && `• ${education}`} {grade && `• Grade ${grade}`}
           </p>
         )}
-        
-        {/* Audio Controls */}
-        <div className="mt-2 flex justify-center gap-2">
-          {chatHistory.some(msg => msg.audioUrl) && (
-            <>
-              <button
-                onClick={handlePlayLatestAudio}
-                disabled={isPlayingAudio}
-                className={`px-3 py-1 text-sm rounded-lg ${
-                  isPlayingAudio 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
-                }`}
-              >
-                🔊 Play Latest Response
-              </button>
-              {isPlayingAudio && (
-                <button
-                  onClick={handleStopAudio}
-                  className="px-3 py-1 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 cursor-pointer"
-                >
-                  ⏸️ Stop Audio
-                </button>
-              )}
-            </>
-          )}
-        </div>
       </div>
 
       {/* Chat Messages */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-white ml-64"
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          padding: "20px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "15px",
+          backgroundColor: "#fff",
+          minHeight: 0
+        }}
       >
         {chatHistory.length === 0 && (
-          <div className="text-center text-gray-400 mt-12 text-lg">
+          <div style={{ 
+            textAlign: "center", 
+            color: "#999", 
+            marginTop: "50px",
+            fontSize: "1.1em" 
+          }}>
             Start your conversation by typing a message below!
           </div>
         )}
@@ -320,16 +320,19 @@ export default function ChatBox({ selectedPersonality }) {
         {chatHistory.map((msg, index) => (
           <div
             key={index}
-            className={`max-w-[70%] p-3 rounded-xl ${
-              msg.role === "user" 
-                ? "self-end bg-black text-white" 
-                : msg.role === "error"
-                ? "self-start bg-red-50 text-red-800"
-                : "self-start bg-gray-100 text-black"
-            }`}
-            style={{ wordWrap: "break-word", whiteSpace: "pre-wrap" }}
+            style={{
+              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: "70%",
+              padding: "12px 16px",
+              borderRadius: "12px",
+              backgroundColor: msg.role === "user" ? "#000" : msg.role === "error" ? "#ffebee" : "#f0f0f0",
+              color: msg.role === "user" ? "#fff" : msg.role === "error" ? "#c62828" : "#000",
+              wordWrap: "break-word",
+              whiteSpace: "pre-wrap"
+            }}
           >
             {msg.content}
+            
             {msg.audioUrl && (
               <button
                 onClick={() => {
@@ -338,73 +341,132 @@ export default function ChatBox({ selectedPersonality }) {
                     audioRef.current.play();
                   }
                 }}
-                className="ml-2 px-2 py-1 text-xs bg-transparent border border-black rounded cursor-pointer hover:bg-gray-200"
+                style={{
+                  marginLeft: 8,
+                  padding: "2px 6px",
+                  fontSize: 12,
+                  background: "transparent",
+                  border: "1px solid #333",
+                  borderRadius: 4,
+                  cursor: "pointer"
+                }}
               >
                 🔊 Play
               </button>
             )}
-          </div>
+                      </div>
         ))}
 
         {isLoading && (
-          <div className="self-start max-w-[70%] p-3 rounded-xl bg-gray-100 text-gray-600">
+          <div
+            style={{
+              alignSelf: "flex-start",
+              padding: "12px 16px",
+              borderRadius: "12px",
+              backgroundColor: "#f0f0f0",
+              color: "#666"
+            }}
+          >
             Thinking...
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div className="sticky bottom-0 w-full flex justify-center p-5 bg-white border-t border-gray-200 z-50 ml-64">
-        <div className="flex w-full max-w-4xl justify-center items-center gap-2">
-        {/* Audio Toggle Button */}
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          padding: "20px",
+          backgroundColor: "#fff",
+          borderTop: "1px solid #e0e0e0",
+          zIndex: 1000,
+        }}
+      >
         <button
-          onClick={() => setAutoPlayAudio(!autoPlayAudio)}
-          className={`px-4 py-3 rounded-2xl text-lg font-medium border-2 transition-all ${
-            autoPlayAudio 
-              ? 'bg-green-500 border-green-600 text-white hover:bg-green-600' 
-              : 'bg-gray-200 border-gray-300 text-gray-600 hover:bg-gray-300'
-          }`}
-          title={autoPlayAudio ? "Audio ON - Will play responses automatically" : "Audio OFF - Click to enable"}
+          onClick={() => setAutoPlayAudio(prev => !prev)}
+          title={autoPlayAudio ? "Auto-play ON" : "Auto-play OFF"}
+          style={{
+            marginRight: "10px",
+            padding: "0 12px",
+            borderRadius: "20px",
+            fontSize: "1.1em",
+            backgroundColor: autoPlayAudio ? "#10b981" : "#9ca3af",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            minWidth: "48px",
+            alignSelf: "center"
+          }}
         >
-          {autoPlayAudio ? '🔊' : '🔇'}
+          {autoPlayAudio ? "🔊" : "🔇"}
         </button>
-        
-        <textarea
-          ref={textareaRef}
-          placeholder="Type your question here... (Shift+Enter for new line)"
-          value={message}
-          onInput={handleInput}
-          onKeyPress={handleKeyPress}
-          disabled={isLoading}
-          className="flex-1 max-w-[700px] text-base rounded-2xl border border-gray-300 p-4 resize-none overflow-hidden min-h-[50px] max-h-[200px] leading-6"
-        />
+         <textarea
+           ref={textareaRef}
+           placeholder="Type your question here... (Shift+Enter for new line)"
+           value={message}
+           onInput={handleInput}
+           onKeyPress={handleKeyPress}
+           disabled={isLoading}
+           style={{
+             width: "60%",
+             maxWidth: "700px",
+             fontSize: "1.1em",
+             borderRadius: "20px",
+             border: "1px solid #ccc",
+             padding: "15px",
+             marginRight: "10px",
+             resize: "none",
+             overflow: "hidden",
+             minHeight: "50px",
+             maxHeight: "200px",
+             lineHeight: "1.5em",
+             color: "black",
+             backgroundColor: "white",
+           }}
+         />
         <button
           onClick={handleListen}
           disabled={isLoading}
-          className={`px-4 py-3 rounded-2xl text-lg font-medium border-none cursor-pointer min-w-[60px] ${
-            isListening 
-              ? 'bg-red-500 text-white' 
-              : 'bg-gray-900 text-white hover:bg-gray-700'
-          } ${isLoading && 'cursor-not-allowed opacity-50'}`}
-          title="Voice input"
+          style={{
+            padding: "0 20px",
+            borderRadius: "20px",
+            fontSize: "1.2em",
+            backgroundColor: isListening ? "#ef4444" : "#1a1a1a",
+            color: "white",
+            cursor: isLoading ? "not-allowed" : "pointer",
+            border: "none",
+            fontWeight: "500",
+            marginRight: "10px",
+            minWidth: "80px"
+          }}
         >
-          {isListening ? "⏸️" : "🎤"}
+          {isListening ? "🎤 Stop" : "🎤"}
         </button>
         <button
           onClick={handleSubmit}
           disabled={isLoading || message.trim() === ""}
-          className={`px-4 py-3 rounded-2xl text-lg font-medium border-none min-w-[80px] ${
-            isLoading || message.trim() === ""
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : 'bg-gray-900 text-white hover:bg-gray-700 cursor-pointer'
-          }`}
+          style={{
+            padding: "0 20px",
+            borderRadius: "20px",
+            fontSize: "1.2em",
+            backgroundColor: isLoading || message.trim() === "" ? "#666" : "#1a1a1a",
+            color: "white",
+            cursor: isLoading || message.trim() === "" ? "not-allowed" : "pointer",
+            border: "none",
+            fontWeight: "500",
+            minWidth: "80px"
+          }}
         >
           {isLoading ? "..." : "Send"}
         </button>
-        </div>
       </div>
 
-      <audio ref={audioRef} className="hidden" />
+      {/* Hidden audio element for playing responses */}
+      <audio ref={audioRef} style={{ display: "none" }} />
     </div>
   );
 }
