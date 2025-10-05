@@ -16,8 +16,8 @@ const PERSONALITY_VOICE_IDS = {
   "storyteller": "BNgbHR0DNeZixGQVzloa",
   "motivator": "DGzg6RaUqxGRTHSBjfgF",
   "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
-  "pro_gamer": "nPczCjzI2devNBz1zQrb", 
-  "brainrot_buddy": "EXAVITQu4vr4xnSDxMaL",
+  "pro_gamer": "oF3F9Srlnt0plaTRGrew", 
+  "brainrot_buddy": "Ej7b8NK3jVRdCTx2U53T",
   "rhyming_rapper": "qVpGLzi5EhjW3WGVhOa9"
 };
 
