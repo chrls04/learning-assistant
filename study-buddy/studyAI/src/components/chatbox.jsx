@@ -18,8 +18,8 @@ const PERSONALITY_VOICE_IDS = {
   "storyteller": "BNgbHR0DNeZixGQVzloa",
   "motivator": "DGzg6RaUqxGRTHSBjfgF",
   "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
-  "pro_gamer": "oF3F9Srlnt0plaTRGrew", 
-  "brainrot_buddy": "Ej7b8NK3jVRdCTx2U53T",
+  "pro_gamer": "thajOKLdcqh1pzw0ETBO",
+  "brainrot_buddy": "WDXJsFzaHXUACLvslhks",
   "rhyming_rapper": "qVpGLzi5EhjW3WGVhOa9"
 };
 
@@ -51,28 +51,21 @@ const PERSONALITIES = {
     systemPrompt: "You are a visionary CEO mentoring a young professional. Use leadership and innovation language. Draw connections between topics and how they matter in careers, innovation, and growth."
   },
   "pro_gamer": {
-  name: "Pro Gamer",
-  description: "A gaming legend who teaches concepts using gaming terminology, strategies, and epic quest vibes. Perfect for gamers who want to level up their knowledge.",
-  systemPrompt: "You are a legendary pro gamer and streaming personality who makes learning feel like an epic gaming quest. Use gaming terminology naturally throughout your explanations (XP, grinding, boss battles, skill trees, meta, buffs, debuffs, farming, clutch plays, combos, etc.). Frame concepts as game mechanics, challenges, or quests that need to be conquered. Keep the energy high and competitive but supportive — like a pro player coaching their teammate. Use references to popular games when helpful (Minecraft, Fortnite, League, Valorant, Dark Souls, etc.) but stay educational. Celebrate progress like achieving a new rank or unlocking an achievement. Stay completely in character as the Pro Gamer throughout your response."
+    name: "Pro Gamer",
+    description: "A gaming legend who teaches concepts using gaming terminology, strategies, and epic quest vibes. Perfect for gamers who want to level up their knowledge.",
+    systemPrompt: "You are a legendary pro gamer and streaming personality who makes learning feel like an epic gaming quest. Use gaming terminology naturally throughout your explanations (XP, grinding, boss battles, skill trees, meta, buffs, debuffs, farming, clutch plays, combos, etc.). Frame concepts as game mechanics, challenges, or quests that need to be conquered. Keep the energy high and competitive but supportive – like a pro player coaching their teammate. Use references to popular games when helpful (Minecraft, Fortnite, League, Valorant, Dark Souls, etc.) but stay educational. Celebrate progress like achieving a new rank or unlocking an achievement. Stay completely in character as the Pro Gamer throughout your response."
   },
-
   "brainrot_buddy": {
     name: "Brainrot Buddy",
     description: "Your chronically online bestie who speaks fluent Gen Z and explains concepts using memes, slang, and unhinged internet energy. It's giving educational chaos.",
-    systemPrompt: "You are the most chronically online tutor ever — your brain is literally rotted from too much TikTok and you speak in pure Gen Z brainrot. Use terms like: no cap, fr fr, bussin, slay, ate and left no crumbs, it's giving, the way I, not me [doing something], let him cook, understood the assignment, serving, periodt, lowkey/highkey, main character energy, rizz, aura points, sigma, beta, alpha, NPC behavior, cooked, we're so back, it's so over, caught in 4k, ratio, L + ratio, touch grass, based, cringe, mid, chat is this real, delulu, snatched, tea/spill the tea, vibe check, gagged, mother is mothering, icon, legend, the girls are fighting, etc. Reference memes, TikTok sounds, and internet culture naturally. Be unhinged but still teach the actual concept correctly. Use emojis liberally (💀😭🔥✨💅). Call out when something is 'giving' specific vibes. You're like if a teacher and a TikTok comment section had a baby. Stay completely in this chaotic character."
+    systemPrompt: "You are the most chronically online tutor ever – your brain is literally rotted from too much TikTok and you speak in pure Gen Z brainrot. Use terms like: no cap, fr fr, bussin, slay, ate and left no crumbs, it's giving, the way I, not me [doing something], let him cook, understood the assignment, serving, periodt, lowkey/highkey, main character energy, rizz, aura points, sigma, beta, alpha, NPC behavior, cooked, we're so back, it's so over, caught in 4k, ratio, L + ratio, touch grass, based, cringe, mid, chat is this real, delulu, snatched, tea/spill the tea, vibe check, gagged, mother is mothering, icon, legend, the girls are fighting, etc. Reference memes, TikTok sounds, and internet culture naturally. Be unhinged but still teach the actual concept correctly. Use emojis liberally (💀😭🔥✨💅). Call out when something is 'giving' specific vibes. You're like if a teacher and a TikTok comment section had a baby. Stay completely in this chaotic character."
   },
   "rhyming_rapper": {
     name: "Rhyming Rapper",
     description: "A cool educator who explains everything in catchy rhymes and beats.",
     systemPrompt: "You are a rapper teacher. Explain concepts using rhymes and rhythmic flow. Keep it poetic and catchy."
   }
-  
-
-
-
 };
-
-
 
 export default function ChatBox({ selectedPersonality, personalities }) {
   const textareaRef = useRef(null);
@@ -84,15 +77,15 @@ export default function ChatBox({ selectedPersonality, personalities }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [autoPlayAudio, setAutoPlayAudio] = useState(true); // NEW: toggle whether audio auto-plays after generation
-
+  const [isMuted, setIsMuted] = useState(false);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(true);
   const [uploadedFile, setUploadedFile] = useState(null);
 
   // File upload handler
   const handleFileChange = (e) => {
-  const file = e.target.files[0];
-  if (file) setUploadedFile(file);
-    };
+    const file = e.target.files[0];
+    if (file) setUploadedFile(file);
+  };
 
   // Get user profile from localStorage
   const topic = localStorage.getItem("sb_topic") || "";
@@ -167,20 +160,24 @@ export default function ChatBox({ selectedPersonality, personalities }) {
     
     prompt += `STUDENT'S QUESTION:\n${userMessage}\n\n`;
     prompt += "Respond naturally in character. Provide comprehensive explanations with examples. For math, read symbols properly (e.g., '3/6' as 'three divided by six', not 'three forwardslash six').";
-    // Ask the model to keep responses short to help enforce the client-side limit
     prompt += 'Do not use parenthetical actions.';
     prompt += ` Please keep the response under ${OUTPUT_CHAR_LIMIT} characters.`;
     prompt += "Avoid using symbols like * because it doesn't read well aloud.";
-
      
-     return prompt;
-   };
+    return prompt;
+  };
 
   const generateAudio = async (text) => {
-    if (!ELEVEN_LABS_API_KEY) return null;
+    if (!ELEVEN_LABS_API_KEY) {
+      console.warn("ElevenLabs API key not configured");
+      return null;
+    }
     
     const voiceId = PERSONALITY_VOICE_IDS[selectedPersonality];
-    if (!voiceId) return null;
+    if (!voiceId) {
+      console.warn(`No voice ID found for personality: ${selectedPersonality}`);
+      return null;
+    }
 
     try {
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -196,14 +193,18 @@ export default function ChatBox({ selectedPersonality, personalities }) {
         })
       });
 
-      if (response.ok) {
-        const audioBlob = await response.blob();
-        return URL.createObjectURL(audioBlob);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Audio generation failed (${response.status}):`, errorText);
+        return null;
       }
+
+      const audioBlob = await response.blob();
+      return URL.createObjectURL(audioBlob);
     } catch (error) {
       console.error("Audio generation error:", error);
+      return null;
     }
-    return null;
   };
 
   // Helper function to convert file to base64
@@ -235,21 +236,20 @@ export default function ChatBox({ selectedPersonality, personalities }) {
       // Call Gemini API
       let result;
       if (uploadedFile) {
-        const fileData = [
-      {
-        inlineData: {
-        data: await fileToBase64(uploadedFile),
-        mimeType: uploadedFile.type,
-                    },
-      },
-      ];
-      result = await model.generateContent([prompt, ...fileData]);
-        } else {
-      result = await model.generateContent(prompt);
+        const fileData = [{
+          inlineData: {
+            data: await fileToBase64(uploadedFile),
+            mimeType: uploadedFile.type,
+          },
+        }];
+        result = await model.generateContent([prompt, ...fileData]);
+      } else {
+        result = await model.generateContent(prompt);
       }
 
       const response = await result.response;
       const aiResponse = response.text();
+      
       // Enforce client-side output length limit and mark truncation if needed
       const truncatedResponse = aiResponse.length > OUTPUT_CHAR_LIMIT
         ? aiResponse.slice(0, OUTPUT_CHAR_LIMIT) + "..."
@@ -268,6 +268,7 @@ export default function ChatBox({ selectedPersonality, personalities }) {
       // Auto-play audio if available
       if (audioUrl && audioRef.current) {
         audioRef.current.src = audioUrl;
+        audioRef.current.muted = isMuted;
         if (autoPlayAudio) {
           audioRef.current.play().catch(err => console.error("Audio playback error:", err));
         }
@@ -303,6 +304,17 @@ export default function ChatBox({ selectedPersonality, personalities }) {
       setIsListening(true);
       recognitionRef.current.start();
     }
+  };
+
+  const handleMuteToggle = () => {
+    setIsMuted(prev => {
+      const newMuted = !prev;
+      // Apply mute to currently playing audio immediately
+      if (audioRef.current) {
+        audioRef.current.muted = newMuted;
+      }
+      return newMuted;
+    });
   };
 
   const getPersonalityName = () => {
@@ -383,6 +395,7 @@ export default function ChatBox({ selectedPersonality, personalities }) {
                 onClick={() => {
                   if (audioRef.current) {
                     audioRef.current.src = msg.audioUrl;
+                    audioRef.current.muted = isMuted;
                     audioRef.current.play();
                   }
                 }}
@@ -396,10 +409,10 @@ export default function ChatBox({ selectedPersonality, personalities }) {
                   cursor: "pointer"
                 }}
               >
-                🔊 Play
+                Play
               </button>
             )}
-                      </div>
+          </div>
         ))}
 
         {isLoading && (
@@ -417,153 +430,153 @@ export default function ChatBox({ selectedPersonality, personalities }) {
         )}
       </div>
 
-     {/* Input Area */}
-    <div
-    style={{
-    position: "sticky",
-    bottom: 0,
-    width: "100%",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center", 
-    padding: "20px",
-    backgroundColor: "#fff",
-    borderTop: "1px solid #e0e0e0",
-    zIndex: 1000,
-  }}
->
-  <button
-    onClick={() => setAutoPlayAudio(prev => !prev)}
-    title={autoPlayAudio ? "Auto-play ON" : "Auto-play OFF"}
-    style={{
-      marginRight: "10px",
-      padding: "0 12px",
-      borderRadius: "20px",
-      fontSize: "1.1em",
-      backgroundColor: autoPlayAudio ? "#10b981" : "#9ca3af",
-      color: "white",
-      border: "none",
-      cursor: "pointer",
-      minWidth: "48px",
-      alignSelf: "center",
-    }}
-  >
-    {autoPlayAudio ? "🔊" : "🔇"}
-  </button>
+      {/* Input Area */}
+      <div
+        style={{
+          position: "sticky",
+          bottom: 0,
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center", 
+          padding: "20px",
+          backgroundColor: "#fff",
+          borderTop: "1px solid #e0e0e0",
+          zIndex: 1000,
+        }}
+      >
+        {/* Mute Button */}
+        <button
+          onClick={handleMuteToggle}
+          title={isMuted ? "Unmute" : "Mute"}
+          style={{
+            marginRight: "10px",
+            padding: "0 12px",
+            borderRadius: "20px",
+            fontSize: "1.1em",
+            backgroundColor: isMuted ? "#ef4444" : "#10b981",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            minWidth: "48px",
+            height: "48px",
+            alignSelf: "center",
+          }}
+        >
+          {isMuted ? "🔇" : "🔊"}
+        </button>
 
-  {/* 📎 File Upload */}
-  <input
-    type="file"
-    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
-    onChange={handleFileChange}
-    id="file-upload"
-    style={{ display: "none" }}
-  />
+        {/* File Upload */}
+        <input
+          type="file"
+          accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+          onChange={handleFileChange}
+          id="file-upload"
+          style={{ display: "none" }}
+        />
 
-  <label
-    htmlFor="file-upload"
-    style={{
-      display: "flex", 
-      justifyContent: "center",
-      alignItems: "center",
-      width: "48px", // same height as buttons
-      height: "48px",
-      borderRadius: "50%",
-      backgroundColor: uploadedFile ? "#10b981" : "#1a1a1a",
-      color: "white",
-      cursor: "pointer",
-      border: "none",
-      fontSize: "1.3em",
-      marginRight: "10px",
-      transition: "background-color 0.2s ease",
-    }}
-  >
-    📎
-  </label>
+        <label
+          htmlFor="file-upload"
+          style={{
+            display: "flex", 
+            justifyContent: "center",
+            alignItems: "center",
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            backgroundColor: uploadedFile ? "#10b981" : "#1a1a1a",
+            color: "white",
+            cursor: "pointer",
+            border: "none",
+            fontSize: "1.3em",
+            marginRight: "10px",
+            transition: "background-color 0.2s ease",
+          }}
+        >
+          📎
+        </label>
 
-  {uploadedFile && (
-    <span
-      style={{
-        alignSelf: "center",
-        marginRight: "10px",
-        color: "#10b981",
-        fontSize: "0.9em",
-        maxWidth: "150px",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {uploadedFile.name}
-    </span>
-  )}
+        {uploadedFile && (
+          <span
+            style={{
+              alignSelf: "center",
+              marginRight: "10px",
+              color: "#10b981",
+              fontSize: "0.9em",
+              maxWidth: "150px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {uploadedFile.name}
+          </span>
+        )}
 
-  <textarea
-    ref={textareaRef}
-    placeholder="Type your question here... (Shift+Enter for new line)"
-    value={message}
-    onInput={handleInput}
-    onKeyPress={handleKeyPress}
-    disabled={isLoading}
-    style={{
-      width: "60%",
-      maxWidth: "700px",
-      fontSize: "1.1em",
-      borderRadius: "20px",
-      border: "1px solid #ccc",
-      padding: "15px",
-      marginRight: "10px",
-      resize: "none",
-      overflow: "hidden",
-      minHeight: "50px",
-      maxHeight: "200px",
-      lineHeight: "1.5em",
-      color: "black",
-      backgroundColor: "white",
-    }}
-  />
+        <textarea
+          ref={textareaRef}
+          placeholder="Type your question here... (Shift+Enter for new line)"
+          value={message}
+          onInput={handleInput}
+          onKeyPress={handleKeyPress}
+          disabled={isLoading}
+          style={{
+            width: "60%",
+            maxWidth: "700px",
+            fontSize: "1.1em",
+            borderRadius: "20px",
+            border: "1px solid #ccc",
+            padding: "15px",
+            marginRight: "10px",
+            resize: "none",
+            overflow: "hidden",
+            minHeight: "50px",
+            maxHeight: "200px",
+            lineHeight: "1.5em",
+            color: "black",
+            backgroundColor: "white",
+          }}
+        />
 
-  <button
-    onClick={handleListen}
-    disabled={isLoading}
-    style={{
-      padding: "0 20px",
-      borderRadius: "20px",
-      fontSize: "1.2em",
-      backgroundColor: isListening ? "#ef4444" : "#1a1a1a",
-      color: "white",
-      cursor: isLoading ? "not-allowed" : "pointer",
-      border: "none",
-      fontWeight: "500",
-      marginRight: "10px",
-      minWidth: "80px",
-      height: "48px", // 🟢 match height for perfect alignment
-    }}
-  >
-    {isListening ? "🎤 Stop" : "🎤"}
-  </button>
+        <button
+          onClick={handleListen}
+          disabled={isLoading}
+          style={{
+            padding: "0 20px",
+            borderRadius: "20px",
+            fontSize: "1.2em",
+            backgroundColor: isListening ? "#ef4444" : "#1a1a1a",
+            color: "white",
+            cursor: isLoading ? "not-allowed" : "pointer",
+            border: "none",
+            fontWeight: "500",
+            marginRight: "10px",
+            minWidth: "80px",
+            height: "48px",
+          }}
+        >
+          {isListening ? "Stop" : "🎤"}
+        </button>
 
-  <button
-    onClick={handleSubmit}
-    disabled={isLoading || message.trim() === ""}
-    style={{
-      padding: "0 20px",
-      borderRadius: "20px",
-      fontSize: "1.2em",
-      backgroundColor: isLoading || message.trim() === "" ? "#666" : "#1a1a1a",
-      color: "white",
-      cursor: isLoading || message.trim() === "" ? "not-allowed" : "pointer",
-      border: "none",
-      fontWeight: "500",
-      minWidth: "80px",
-      height: "48px", // 🟢 match height
-    }}
-  >
-    {isLoading ? "..." : "Send"}
-  </button>
-</div>
-
-
+        <button
+          onClick={handleSubmit}
+          disabled={isLoading || message.trim() === ""}
+          style={{
+            padding: "0 20px",
+            borderRadius: "20px",
+            fontSize: "1.2em",
+            backgroundColor: isLoading || message.trim() === "" ? "#666" : "#1a1a1a",
+            color: "white",
+            cursor: isLoading || message.trim() === "" ? "not-allowed" : "pointer",
+            border: "none",
+            fontWeight: "500",
+            minWidth: "80px",
+            height: "48px",
+          }}
+        >
+          {isLoading ? "..." : "Send"}
+        </button>
+      </div>
 
       {/* Hidden audio element for playing responses */}
       <audio ref={audioRef} style={{ display: "none" }} />
