@@ -1,1 +1,1 @@
-# learning-assistant
+# Stubby- AI
