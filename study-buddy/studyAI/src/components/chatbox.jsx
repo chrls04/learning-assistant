@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -8,11 +10,11 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 // Eleven Labs configuration
 const ELEVEN_LABS_API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
 // Output character limit for chatbot responses
-const OUTPUT_CHAR_LIMIT = 700;
+const OUTPUT_CHAR_LIMIT = 1000;
 
 const PERSONALITY_VOICE_IDS = {
   "friendly_tutor": "pwMBn0SsmN1220Aorv15",
-  "serious_professor": "ClF3eMOzqYc7v2G67EkD",
+  "serious_professor": "dUercWozs0yhe4xBCgZ0",
   "storyteller": "BNgbHR0DNeZixGQVzloa",
   "motivator": "DGzg6RaUqxGRTHSBjfgF",
   "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
@@ -83,6 +85,14 @@ export default function ChatBox({ selectedPersonality, personalities }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [autoPlayAudio, setAutoPlayAudio] = useState(true); // NEW: toggle whether audio auto-plays after generation
+
+  const [uploadedFile, setUploadedFile] = useState(null);
+
+  // File upload handler
+  const handleFileChange = (e) => {
+  const file = e.target.files[0];
+  if (file) setUploadedFile(file);
+    };
 
   // Get user profile from localStorage
   const topic = localStorage.getItem("sb_topic") || "";
@@ -196,11 +206,22 @@ export default function ChatBox({ selectedPersonality, personalities }) {
     return null;
   };
 
+  // Helper function to convert file to base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+    });
+  };
+  
   const handleSubmit = async () => {
     if (message.trim() === "" || isLoading) return;
 
     const userMessage = message.trim();
     setMessage("");
+    setUploadedFile(null);
     textareaRef.current.style.height = "auto";
 
     // Add user message to chat
@@ -212,7 +233,21 @@ export default function ChatBox({ selectedPersonality, personalities }) {
       const prompt = buildPrompt(userMessage);
 
       // Call Gemini API
-      const result = await model.generateContent(prompt);
+      let result;
+      if (uploadedFile) {
+        const fileData = [
+      {
+        inlineData: {
+        data: await fileToBase64(uploadedFile),
+        mimeType: uploadedFile.type,
+                    },
+      },
+      ];
+      result = await model.generateContent([prompt, ...fileData]);
+        } else {
+      result = await model.generateContent(prompt);
+      }
+
       const response = await result.response;
       const aiResponse = response.text();
       // Enforce client-side output length limit and mark truncation if needed
@@ -382,98 +417,153 @@ export default function ChatBox({ selectedPersonality, personalities }) {
         )}
       </div>
 
-      {/* Input Area */}
-      <div
-        style={{
-          position: "sticky",
-          bottom: 0,
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-          padding: "20px",
-          backgroundColor: "#fff",
-          borderTop: "1px solid #e0e0e0",
-          zIndex: 1000,
-        }}
-      >
-        <button
-          onClick={() => setAutoPlayAudio(prev => !prev)}
-          title={autoPlayAudio ? "Auto-play ON" : "Auto-play OFF"}
-          style={{
-            marginRight: "10px",
-            padding: "0 12px",
-            borderRadius: "20px",
-            fontSize: "1.1em",
-            backgroundColor: autoPlayAudio ? "#10b981" : "#9ca3af",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-            minWidth: "48px",
-            alignSelf: "center"
-          }}
-        >
-          {autoPlayAudio ? "🔊" : "🔇"}
-        </button>
-         <textarea
-           ref={textareaRef}
-           placeholder="Type your question here... (Shift+Enter for new line)"
-           value={message}
-           onInput={handleInput}
-           onKeyPress={handleKeyPress}
-           disabled={isLoading}
-           style={{
-             width: "60%",
-             maxWidth: "700px",
-             fontSize: "1.1em",
-             borderRadius: "20px",
-             border: "1px solid #ccc",
-             padding: "15px",
-             marginRight: "10px",
-             resize: "none",
-             overflow: "hidden",
-             minHeight: "50px",
-             maxHeight: "200px",
-             lineHeight: "1.5em",
-             color: "black",
-             backgroundColor: "white",
-           }}
-         />
-        <button
-          onClick={handleListen}
-          disabled={isLoading}
-          style={{
-            padding: "0 20px",
-            borderRadius: "20px",
-            fontSize: "1.2em",
-            backgroundColor: isListening ? "#ef4444" : "#1a1a1a",
-            color: "white",
-            cursor: isLoading ? "not-allowed" : "pointer",
-            border: "none",
-            fontWeight: "500",
-            marginRight: "10px",
-            minWidth: "80px"
-          }}
-        >
-          {isListening ? "🎤 Stop" : "🎤"}
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading || message.trim() === ""}
-          style={{
-            padding: "0 20px",
-            borderRadius: "20px",
-            fontSize: "1.2em",
-            backgroundColor: isLoading || message.trim() === "" ? "#666" : "#1a1a1a",
-            color: "white",
-            cursor: isLoading || message.trim() === "" ? "not-allowed" : "pointer",
-            border: "none",
-            fontWeight: "500",
-            minWidth: "80px"
-          }}
-        >
-          {isLoading ? "..." : "Send"}
-        </button>
-      </div>
+     {/* Input Area */}
+    <div
+    style={{
+    position: "sticky",
+    bottom: 0,
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center", 
+    padding: "20px",
+    backgroundColor: "#fff",
+    borderTop: "1px solid #e0e0e0",
+    zIndex: 1000,
+  }}
+>
+  <button
+    onClick={() => setAutoPlayAudio(prev => !prev)}
+    title={autoPlayAudio ? "Auto-play ON" : "Auto-play OFF"}
+    style={{
+      marginRight: "10px",
+      padding: "0 12px",
+      borderRadius: "20px",
+      fontSize: "1.1em",
+      backgroundColor: autoPlayAudio ? "#10b981" : "#9ca3af",
+      color: "white",
+      border: "none",
+      cursor: "pointer",
+      minWidth: "48px",
+      alignSelf: "center",
+    }}
+  >
+    {autoPlayAudio ? "🔊" : "🔇"}
+  </button>
+
+  {/* 📎 File Upload */}
+  <input
+    type="file"
+    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+    onChange={handleFileChange}
+    id="file-upload"
+    style={{ display: "none" }}
+  />
+
+  <label
+    htmlFor="file-upload"
+    style={{
+      display: "flex", 
+      justifyContent: "center",
+      alignItems: "center",
+      width: "48px", // same height as buttons
+      height: "48px",
+      borderRadius: "50%",
+      backgroundColor: uploadedFile ? "#10b981" : "#1a1a1a",
+      color: "white",
+      cursor: "pointer",
+      border: "none",
+      fontSize: "1.3em",
+      marginRight: "10px",
+      transition: "background-color 0.2s ease",
+    }}
+  >
+    📎
+  </label>
+
+  {uploadedFile && (
+    <span
+      style={{
+        alignSelf: "center",
+        marginRight: "10px",
+        color: "#10b981",
+        fontSize: "0.9em",
+        maxWidth: "150px",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {uploadedFile.name}
+    </span>
+  )}
+
+  <textarea
+    ref={textareaRef}
+    placeholder="Type your question here... (Shift+Enter for new line)"
+    value={message}
+    onInput={handleInput}
+    onKeyPress={handleKeyPress}
+    disabled={isLoading}
+    style={{
+      width: "60%",
+      maxWidth: "700px",
+      fontSize: "1.1em",
+      borderRadius: "20px",
+      border: "1px solid #ccc",
+      padding: "15px",
+      marginRight: "10px",
+      resize: "none",
+      overflow: "hidden",
+      minHeight: "50px",
+      maxHeight: "200px",
+      lineHeight: "1.5em",
+      color: "black",
+      backgroundColor: "white",
+    }}
+  />
+
+  <button
+    onClick={handleListen}
+    disabled={isLoading}
+    style={{
+      padding: "0 20px",
+      borderRadius: "20px",
+      fontSize: "1.2em",
+      backgroundColor: isListening ? "#ef4444" : "#1a1a1a",
+      color: "white",
+      cursor: isLoading ? "not-allowed" : "pointer",
+      border: "none",
+      fontWeight: "500",
+      marginRight: "10px",
+      minWidth: "80px",
+      height: "48px", // 🟢 match height for perfect alignment
+    }}
+  >
+    {isListening ? "🎤 Stop" : "🎤"}
+  </button>
+
+  <button
+    onClick={handleSubmit}
+    disabled={isLoading || message.trim() === ""}
+    style={{
+      padding: "0 20px",
+      borderRadius: "20px",
+      fontSize: "1.2em",
+      backgroundColor: isLoading || message.trim() === "" ? "#666" : "#1a1a1a",
+      color: "white",
+      cursor: isLoading || message.trim() === "" ? "not-allowed" : "pointer",
+      border: "none",
+      fontWeight: "500",
+      minWidth: "80px",
+      height: "48px", // 🟢 match height
+    }}
+  >
+    {isLoading ? "..." : "Send"}
+  </button>
+</div>
+
+
 
       {/* Hidden audio element for playing responses */}
       <audio ref={audioRef} style={{ display: "none" }} />
