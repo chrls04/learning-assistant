@@ -1,51 +1,21 @@
 import { useRef, useState, useEffect } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { useUserProfile } from "../context/UserProfileContext";
+import { PERSONALITIES, PERSONALITY_VOICE_IDS, getPersonality } from "../config/personalities";
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-
-// Eleven Labs configuration
+// Initialize Gemini - with error checking
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const ELEVEN_LABS_API_KEY = import.meta.env.VITE_ELEVEN_LABS_API_KEY;
 
-const PERSONALITY_VOICE_IDS = {
-  "friendly_tutor": "pwMBn0SsmN1220Aorv15",
-  "serious_professor": "ClF3eMOzqYc7v2G67EkD",
-  "storyteller": "BNgbHR0DNeZixGQVzloa",
-  "motivator": "DGzg6RaUqxGRTHSBjfgF",
-  "visionary_ceo": "oziFLKtaxVDHQAh7o45V"
-};
+if (!GEMINI_KEY || GEMINI_KEY === 'undefined') {
+  console.error('⚠️ GEMINI API KEY IS MISSING! Check your .env file');
+}
 
-// Personality definitions (moved from backend)
-const PERSONALITIES = {
-  "friendly_tutor": {
-    name: "Friendly Tutor",
-    description: "A bubbly, patient teacher who explains with real-life mini examples and emojis.",
-    systemPrompt: "You are a cheerful and approachable tutor who helps younger students understand tricky topics. Explain with warmth, humor, and tiny real-life examples (like pizza slices, video games, or school life). Use clear everyday language and add emojis to keep it fun."
-  },
-  "serious_professor": {
-    name: "Serious Professor",
-    description: "A calm, precise educator with academic tone; uses structure, logic, and brief examples.",
-    systemPrompt: "You are a highly knowledgeable professor who values clarity, logic, and academic rigor. Provide structured, step-by-step explanations, use correct terminology, and cite examples or formulas that show real conceptual depth."
-  },
-  "storyteller": {
-    name: "Storyteller",
-    description: "A creative explainer who turns lessons into tiny imaginative stories or metaphors.",
-    systemPrompt: "You are a captivating storyteller who teaches through imagination. Every explanation should feel like a short, vivid story or scene that sneaks in the concept naturally."
-  },
-  "motivator": {
-    name: "Coach Commander",
-    description: "A bold, high-energy commander who motivates learners with military-level focus.",
-    systemPrompt: "You are a tough but encouraging commander leading a learning squad. Speak with energy, confidence, and authority. Push learners to stay disciplined, focused, and resilient. End every response with a short motivational quote."
-  },
-  "visionary_ceo": {
-    name: "Visionary CEO",
-    description: "A strategic, forward-thinking leader who connects learning to real-world innovation.",
-    systemPrompt: "You are a visionary CEO mentoring a young professional. Use leadership and innovation language. Draw connections between topics and how they matter in careers, innovation, and growth."
-  }
-};
+const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-export default function ChatBox({ selectedPersonality, personalities }) {
+export default function ChatBox({ selectedPersonality }) {
+  const { profile } = useUserProfile();
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
   const audioRef = useRef(null);
@@ -55,11 +25,6 @@ export default function ChatBox({ selectedPersonality, personalities }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-
-  // Get user profile from localStorage
-  const topic = localStorage.getItem("sb_topic") || "";
-  const education = localStorage.getItem("sb_education") || "";
-  const grade = localStorage.getItem("sb_grade") || "";
 
   // Initialize speech recognition
   useEffect(() => {
@@ -107,15 +72,15 @@ export default function ChatBox({ selectedPersonality, personalities }) {
   };
 
   const buildPrompt = (userMessage) => {
-    const personality = PERSONALITIES[selectedPersonality] || PERSONALITIES["friendly_tutor"];
+    const personality = getPersonality(selectedPersonality);
     
     let prompt = `ROLE AND PERSONA:\n${personality.systemPrompt}\n\n`;
     
-    if (topic || education || grade) {
+    if (profile.topic || profile.education || profile.grade) {
       prompt += "LEARNER CONTEXT:\n";
-      if (topic) prompt += `Learning Topic: ${topic}\n`;
-      if (education) prompt += `Education Level: ${education}\n`;
-      if (grade) prompt += `Grade/Academic Level: ${grade}\n`;
+      if (profile.topic) prompt += `Learning Topic: ${profile.topic}\n`;
+      if (profile.education) prompt += `Education Level: ${profile.education}\n`;
+      if (profile.grade) prompt += `Grade/Academic Level: ${profile.grade}\n`;
       prompt += "\n";
     }
     
@@ -128,7 +93,31 @@ export default function ChatBox({ selectedPersonality, personalities }) {
     }
     
     prompt += `STUDENT'S QUESTION:\n${userMessage}\n\n`;
-    prompt += "Respond naturally in character. Provide comprehensive explanations with examples. For math, read symbols properly (e.g., '3/6' as 'three divided by six', not 'three forwardslash six').";
+    
+    // Add response format instructions
+    prompt += `RESPONSE REQUIREMENTS:\n${personality.responseFormat}\n\n`;
+    
+    // Additional universal requirements
+    prompt += "ADDITIONAL INSTRUCTIONS:\n";
+    prompt += "- Provide comprehensive, thorough explanations that fully address the question\n";
+    prompt += "- Include multiple examples (2-3) that illustrate different aspects of the concept\n";
+    prompt += "- For any problem-solving: provide detailed step-by-step solutions with explanations for each step\n";
+    prompt += "- Use your personality's unique style consistently throughout the response\n";
+    prompt += "- Ensure answers are accurate, educational, and age-appropriate\n";
+    prompt += "- If including quizzes or exercises, provide complete solutions and explanations\n";
+    prompt += "- Make learning engaging while maintaining educational integrity\n\n";
+    
+    // Critical math and arithmetic reading instructions
+    prompt += "**READ ARITHMETIC PROPERLY**: When reading mathematical expressions:\n";
+    prompt += "- Say '3 divided by 6' NOT '3 forwardslash 6'\n";
+    prompt += "- Say '5 times 2' or '5 multiplied by 2' NOT '5 star 2'\n";
+    prompt += "- Say '2 plus 3' NOT '2 plus sign 3'\n";
+    prompt += "- Say '8 minus 4' NOT '8 dash 4'\n";
+    prompt += "- Say 'x squared' NOT 'x caret 2'\n";
+    prompt += "- Say 'the square root of 16' NOT 'sqrt 16'\n";
+    prompt += "- Always read mathematical symbols using proper mathematical terms\n";
+    prompt += "- Write fractions as '1/2' but say 'one half' or '1 divided by 2'\n";
+    prompt += "- Write equations clearly but describe them using proper mathematical language\n";
     
     return prompt;
   };
@@ -170,30 +159,23 @@ export default function ChatBox({ selectedPersonality, personalities }) {
     setMessage("");
     textareaRef.current.style.height = "auto";
 
-    // Add user message to chat
     setChatHistory(prev => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
     try {
-      // Build prompt with personality and context
       const prompt = buildPrompt(userMessage);
-
-      // Call Gemini API
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const aiResponse = response.text();
 
-      // Generate audio
       const audioUrl = await generateAudio(aiResponse);
 
-      // Add AI response to chat
       setChatHistory(prev => [...prev, { 
         role: "assistant", 
         content: aiResponse,
         audioUrl: audioUrl
       }]);
 
-      // Auto-play audio if available
       if (audioUrl && audioRef.current) {
         audioRef.current.src = audioUrl;
         audioRef.current.play().catch(err => console.error("Audio playback error:", err));
@@ -232,30 +214,21 @@ export default function ChatBox({ selectedPersonality, personalities }) {
   };
 
   const getPersonalityName = () => {
-    return PERSONALITIES[selectedPersonality]?.name || selectedPersonality;
+    return getPersonality(selectedPersonality).name;
   };
 
   return (
-    <div style={{ 
-      width: "100%", 
-      height: "100vh", 
-      display: "flex", 
-      flexDirection: "column",
-      position: "relative"
-    }}>
+    <div className="w-full h-screen flex flex-col">
       {/* Chat Header */}
-      <div style={{
-        padding: "20px",
-        borderBottom: "1px solid #e0e0e0",
-        backgroundColor: "#f9f9f9",
-        textAlign: "center"
-      }}>
-        <h2 style={{ margin: 0, color: "#000" }}>
+      <div className="p-5 border-b border-gray-200 bg-gray-50 text-center">
+        <h2 className="text-xl font-semibold text-black m-0">
           Chatting with: {getPersonalityName()}
         </h2>
-        {topic && (
-          <p style={{ margin: "5px 0 0 0", color: "#666", fontSize: "0.9em" }}>
-            Topic: {topic} {education && `• ${education}`} {grade && `• Grade ${grade}`}
+        {profile.topic && (
+          <p className="mt-1 text-gray-600 text-sm">
+            Topic: {profile.topic} 
+            {profile.education && ` • ${profile.education}`} 
+            {profile.grade && ` • Grade ${profile.grade}`}
           </p>
         )}
       </div>
@@ -263,23 +236,10 @@ export default function ChatBox({ selectedPersonality, personalities }) {
       {/* Chat Messages */}
       <div 
         ref={chatContainerRef}
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "20px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "15px",
-          backgroundColor: "#fff"
-        }}
+        className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-white"
       >
         {chatHistory.length === 0 && (
-          <div style={{ 
-            textAlign: "center", 
-            color: "#999", 
-            marginTop: "50px",
-            fontSize: "1.1em" 
-          }}>
+          <div className="text-center text-gray-400 mt-12 text-lg">
             Start your conversation by typing a message below!
           </div>
         )}
@@ -287,16 +247,14 @@ export default function ChatBox({ selectedPersonality, personalities }) {
         {chatHistory.map((msg, index) => (
           <div
             key={index}
-            style={{
-              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "70%",
-              padding: "12px 16px",
-              borderRadius: "12px",
-              backgroundColor: msg.role === "user" ? "#000" : msg.role === "error" ? "#ffebee" : "#f0f0f0",
-              color: msg.role === "user" ? "#fff" : msg.role === "error" ? "#c62828" : "#000",
-              wordWrap: "break-word",
-              whiteSpace: "pre-wrap"
-            }}
+            className={`max-w-[70%] p-3 rounded-xl ${
+              msg.role === "user" 
+                ? "self-end bg-black text-white" 
+                : msg.role === "error"
+                ? "self-start bg-red-50 text-red-800"
+                : "self-start bg-gray-100 text-black"
+            }`}
+            style={{ wordWrap: "break-word", whiteSpace: "pre-wrap" }}
           >
             {msg.content}
             {msg.audioUrl && (
@@ -307,15 +265,7 @@ export default function ChatBox({ selectedPersonality, personalities }) {
                     audioRef.current.play();
                   }
                 }}
-                style={{
-                  marginLeft: "10px",
-                  padding: "4px 8px",
-                  fontSize: "0.8em",
-                  backgroundColor: "transparent",
-                  border: "1px solid #000",
-                  borderRadius: "4px",
-                  cursor: "pointer"
-                }}
+                className="ml-2 px-2 py-1 text-xs bg-transparent border border-black rounded cursor-pointer hover:bg-gray-200"
               >
                 🔊 Play
               </button>
@@ -324,34 +274,14 @@ export default function ChatBox({ selectedPersonality, personalities }) {
         ))}
 
         {isLoading && (
-          <div
-            style={{
-              alignSelf: "flex-start",
-              padding: "12px 16px",
-              borderRadius: "12px",
-              backgroundColor: "#f0f0f0",
-              color: "#666"
-            }}
-          >
+          <div className="self-start max-w-[70%] p-3 rounded-xl bg-gray-100 text-gray-600">
             Thinking...
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div
-        style={{
-          position: "sticky",
-          bottom: 0,
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-          padding: "20px",
-          backgroundColor: "#fff",
-          borderTop: "1px solid #e0e0e0",
-          zIndex: 1000,
-        }}
-      >
+      <div className="sticky bottom-0 w-full flex justify-center p-5 bg-white border-t border-gray-200 z-50">
         <textarea
           ref={textareaRef}
           placeholder="Type your question here... (Shift+Enter for new line)"
@@ -359,62 +289,33 @@ export default function ChatBox({ selectedPersonality, personalities }) {
           onInput={handleInput}
           onKeyPress={handleKeyPress}
           disabled={isLoading}
-          style={{
-            width: "60%",
-            maxWidth: "700px",
-            fontSize: "1.1em",
-            borderRadius: "20px",
-            border: "1px solid #ccc",
-            padding: "15px",
-            marginRight: "10px",
-            resize: "none",
-            overflow: "hidden",
-            minHeight: "50px",
-            maxHeight: "200px",
-            lineHeight: "1.5em",
-            color: "black",
-            backgroundColor: "white",
-          }}
+          className="w-3/5 max-w-[700px] text-base rounded-2xl border border-gray-300 p-4 mr-2 resize-none overflow-hidden min-h-[50px] max-h-[200px] leading-6"
         />
         <button
           onClick={handleListen}
           disabled={isLoading}
-          style={{
-            padding: "0 20px",
-            borderRadius: "20px",
-            fontSize: "1.2em",
-            backgroundColor: isListening ? "#ef4444" : "#1a1a1a",
-            color: "white",
-            cursor: isLoading ? "not-allowed" : "pointer",
-            border: "none",
-            fontWeight: "500",
-            marginRight: "10px",
-            minWidth: "80px"
-          }}
+          className={`px-5 rounded-2xl text-lg font-medium mr-2 min-w-[80px] border-none cursor-pointer ${
+            isListening 
+              ? 'bg-red-500 text-white' 
+              : 'bg-gray-900 text-white hover:bg-gray-700'
+          } ${isLoading && 'cursor-not-allowed opacity-50'}`}
         >
           {isListening ? "🎤 Stop" : "🎤"}
         </button>
         <button
           onClick={handleSubmit}
           disabled={isLoading || message.trim() === ""}
-          style={{
-            padding: "0 20px",
-            borderRadius: "20px",
-            fontSize: "1.2em",
-            backgroundColor: isLoading || message.trim() === "" ? "#666" : "#1a1a1a",
-            color: "white",
-            cursor: isLoading || message.trim() === "" ? "not-allowed" : "pointer",
-            border: "none",
-            fontWeight: "500",
-            minWidth: "80px"
-          }}
+          className={`px-5 rounded-2xl text-lg font-medium min-w-[80px] border-none ${
+            isLoading || message.trim() === ""
+              ? 'bg-gray-400 text-white cursor-not-allowed'
+              : 'bg-gray-900 text-white hover:bg-gray-700 cursor-pointer'
+          }`}
         >
           {isLoading ? "..." : "Send"}
         </button>
       </div>
 
-      {/* Hidden audio element for playing responses */}
-      <audio ref={audioRef} style={{ display: "none" }} />
+      <audio ref={audioRef} className="hidden" />
     </div>
   );
 }

@@ -1,37 +1,10 @@
 import React, { useState } from "react";
 import ChatBox from "./chatbox.jsx";
-
-// Personality definitions (no backend needed)
-const personalities = [
-  { 
-    key: "friendly_tutor",
-    name: "Friendly Tutor", 
-    description: "A bubbly, patient teacher who explains with real-life mini examples and emojis. Ideal for Grades 4–8." 
-  },
-  { 
-    key: "serious_professor",
-    name: "Serious Professor", 
-    description: "A calm, precise educator with academic tone; uses structure, logic, and brief examples. Ideal for high-school or university." 
-  },
-  { 
-    key: "storyteller",
-    name: "Storyteller", 
-    description: "A creative explainer who turns lessons into tiny imaginative stories or metaphors that stick." 
-  },
-  { 
-    key: "motivator",
-    name: "Coach Commander", 
-    description: "A bold, high-energy commander who motivates learners with military-level focus and discipline." 
-  },
-  { 
-    key: "visionary_ceo",
-    name: "Visionary CEO", 
-    description: "A strategic, forward-thinking leader who connects learning to real-world innovation, leadership, and impact." 
-  },
-];
+import { getPersonalitiesList } from "../config/personalities";
 
 export default function PersonalitiesPage() {
   const [selectedPersonality, setSelectedPersonality] = useState(null);
+  const personalities = getPersonalitiesList();
 
   const handleCardClick = (key) => {
     if (selectedPersonality === key) {
@@ -44,7 +17,7 @@ export default function PersonalitiesPage() {
   return (
     <div className="relative min-h-screen flex bg-white text-black">
       {/* Sidebar */}
-      <aside className="w-64 bg-black text-white flex flex-col p-4 space-y-4">  
+      <aside className="w-64 bg-black text-white flex flex-col p-4 space-y-4 overflow-y-auto">  
         <h2 className="text-2xl font-bold mb-4">Personalities</h2>
         {personalities.map((p) => (
           <div
@@ -55,7 +28,7 @@ export default function PersonalitiesPage() {
             onClick={() => handleCardClick(p.key)}
           >
             <h3 className="font-semibold text-lg">{p.name}</h3>
-            <p className="text-sm opacity-80">{p.description}</p>
+            <p className="text-sm opacity-80 mt-1">{p.description}</p>
           </div>
         ))}
       </aside>
@@ -69,10 +42,7 @@ export default function PersonalitiesPage() {
         )}
 
         {selectedPersonality && (
-          <ChatBox 
-            selectedPersonality={selectedPersonality}
-            personalities={personalities}
-          />
+          <ChatBox selectedPersonality={selectedPersonality} />
         )}
       </main>
     </div>
