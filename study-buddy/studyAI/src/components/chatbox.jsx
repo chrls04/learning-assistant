@@ -14,7 +14,7 @@ const OUTPUT_CHAR_LIMIT = 1000;
 
 const PERSONALITY_VOICE_IDS = {
   "friendly_tutor": "pwMBn0SsmN1220Aorv15",
-  "serious_professor": "ClF3eMOzqYc7v2G67EkD",
+  "serious_professor": "dUercWozs0yhe4xBCgZ0",
   "storyteller": "BNgbHR0DNeZixGQVzloa",
   "motivator": "DGzg6RaUqxGRTHSBjfgF",
   "visionary_ceo": "oziFLKtaxVDHQAh7o45V",
