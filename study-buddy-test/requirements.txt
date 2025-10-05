@@ -5,5 +5,5 @@ requests
 SpeechRecognition
 pyaudio
 flask-cors
-
+google-generativeai==0.3.2
 

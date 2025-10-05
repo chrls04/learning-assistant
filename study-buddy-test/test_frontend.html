@@ -179,14 +179,14 @@
                 
                 if (d.status === 'success' && d.text) {
                     messageEl.value = d.text;
-                    voiceStatus.textContent = `✅ Captured: "${d.text}"`;
+                    voiceStatus.textContent = ` Captured: "${d.text}"`;
                     voiceStatus.style.color = '#4CAF50';
                 } else {
-                    voiceStatus.textContent = `⚠️ ${d.message || 'No speech detected'}`;
+                    voiceStatus.textContent = `${d.message || 'No speech detected'}`;
                     voiceStatus.style.color = '#ff9800';
                 }
             } catch (e) {
-                voiceStatus.textContent = '❌ Error: ' + String(e);
+                voiceStatus.textContent = ' Error: ' + String(e);
                 voiceStatus.style.color = '#f44336';
             } finally {
                 voiceBtn.disabled = false;
