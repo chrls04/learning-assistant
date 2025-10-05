@@ -25,6 +25,8 @@ export default function ChatBox({ selectedPersonality }) {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(true); // Toggle for auto-play
 
   // Initialize speech recognition
   useEffect(() => {
@@ -123,11 +125,19 @@ export default function ChatBox({ selectedPersonality }) {
   };
 
   const generateAudio = async (text) => {
-    if (!ELEVEN_LABS_API_KEY) return null;
+    if (!ELEVEN_LABS_API_KEY) {
+      console.warn('Eleven Labs API key not found - skipping audio generation');
+      return null;
+    }
     
     const voiceId = PERSONALITY_VOICE_IDS[selectedPersonality];
-    if (!voiceId) return null;
+    if (!voiceId) {
+      console.warn(`No voice ID found for personality: ${selectedPersonality}`);
+      return null;
+    }
 
+    console.log('Generating audio for text length:', text.length);
+    
     try {
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: "POST",
@@ -138,18 +148,25 @@ export default function ChatBox({ selectedPersonality }) {
         body: JSON.stringify({
           text: text,
           voice_settings: {},
+          model_id: "eleven_monolingual_v1",
           output_format: "mp3_44100_128"
         })
       });
 
       if (response.ok) {
         const audioBlob = await response.blob();
-        return URL.createObjectURL(audioBlob);
+        const audioUrl = URL.createObjectURL(audioBlob);
+        console.log('Audio generated successfully');
+        return audioUrl;
+      } else {
+        const errorText = await response.text();
+        console.error('Eleven Labs API error:', response.status, errorText);
+        return null;
       }
     } catch (error) {
       console.error("Audio generation error:", error);
+      return null;
     }
-    return null;
   };
 
   const handleSubmit = async () => {
@@ -176,8 +193,13 @@ export default function ChatBox({ selectedPersonality }) {
         audioUrl: audioUrl
       }]);
 
-      if (audioUrl && audioRef.current) {
+      console.log('Audio URL:', audioUrl ? 'Generated' : 'Not generated');
+
+      if (audioUrl && audioRef.current && autoPlayAudio) {
         audioRef.current.src = audioUrl;
+        audioRef.current.onplay = () => setIsPlayingAudio(true);
+        audioRef.current.onended = () => setIsPlayingAudio(false);
+        audioRef.current.onpause = () => setIsPlayingAudio(false);
         audioRef.current.play().catch(err => console.error("Audio playback error:", err));
       }
 
@@ -217,10 +239,25 @@ export default function ChatBox({ selectedPersonality }) {
     return getPersonality(selectedPersonality).name;
   };
 
+  const handlePlayLatestAudio = () => {
+    const latestMessageWithAudio = [...chatHistory].reverse().find(msg => msg.audioUrl);
+    if (latestMessageWithAudio && audioRef.current) {
+      audioRef.current.src = latestMessageWithAudio.audioUrl;
+      audioRef.current.play();
+    }
+  };
+
+  const handleStopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
   return (
     <div className="w-full h-screen flex flex-col">
       {/* Chat Header */}
-      <div className="p-5 border-b border-gray-200 bg-gray-50 text-center">
+      <div className="p-5 border-b border-gray-200 bg-gray-50 text-center ml-64">
         <h2 className="text-xl font-semibold text-black m-0">
           Chatting with: {getPersonalityName()}
         </h2>
@@ -231,12 +268,39 @@ export default function ChatBox({ selectedPersonality }) {
             {profile.grade && ` • Grade ${profile.grade}`}
           </p>
         )}
+        
+        {/* Audio Controls */}
+        <div className="mt-2 flex justify-center gap-2">
+          {chatHistory.some(msg => msg.audioUrl) && (
+            <>
+              <button
+                onClick={handlePlayLatestAudio}
+                disabled={isPlayingAudio}
+                className={`px-3 py-1 text-sm rounded-lg ${
+                  isPlayingAudio 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                }`}
+              >
+                🔊 Play Latest Response
+              </button>
+              {isPlayingAudio && (
+                <button
+                  onClick={handleStopAudio}
+                  className="px-3 py-1 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+                >
+                  ⏸️ Stop Audio
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Chat Messages */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-white"
+        className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-white ml-64"
       >
         {chatHistory.length === 0 && (
           <div className="text-center text-gray-400 mt-12 text-lg">
@@ -281,7 +345,21 @@ export default function ChatBox({ selectedPersonality }) {
       </div>
 
       {/* Input Area */}
-      <div className="sticky bottom-0 w-full flex justify-center p-5 bg-white border-t border-gray-200 z-50">
+      <div className="sticky bottom-0 w-full flex justify-center p-5 bg-white border-t border-gray-200 z-50 ml-64">
+        <div className="flex w-full max-w-4xl justify-center items-center gap-2">
+        {/* Audio Toggle Button */}
+        <button
+          onClick={() => setAutoPlayAudio(!autoPlayAudio)}
+          className={`px-4 py-3 rounded-2xl text-lg font-medium border-2 transition-all ${
+            autoPlayAudio 
+              ? 'bg-green-500 border-green-600 text-white hover:bg-green-600' 
+              : 'bg-gray-200 border-gray-300 text-gray-600 hover:bg-gray-300'
+          }`}
+          title={autoPlayAudio ? "Audio ON - Will play responses automatically" : "Audio OFF - Click to enable"}
+        >
+          {autoPlayAudio ? '🔊' : '🔇'}
+        </button>
+        
         <textarea
           ref={textareaRef}
           placeholder="Type your question here... (Shift+Enter for new line)"
@@ -289,23 +367,24 @@ export default function ChatBox({ selectedPersonality }) {
           onInput={handleInput}
           onKeyPress={handleKeyPress}
           disabled={isLoading}
-          className="w-3/5 max-w-[700px] text-base rounded-2xl border border-gray-300 p-4 mr-2 resize-none overflow-hidden min-h-[50px] max-h-[200px] leading-6"
+          className="flex-1 max-w-[700px] text-base rounded-2xl border border-gray-300 p-4 resize-none overflow-hidden min-h-[50px] max-h-[200px] leading-6"
         />
         <button
           onClick={handleListen}
           disabled={isLoading}
-          className={`px-5 rounded-2xl text-lg font-medium mr-2 min-w-[80px] border-none cursor-pointer ${
+          className={`px-4 py-3 rounded-2xl text-lg font-medium border-none cursor-pointer min-w-[60px] ${
             isListening 
               ? 'bg-red-500 text-white' 
               : 'bg-gray-900 text-white hover:bg-gray-700'
           } ${isLoading && 'cursor-not-allowed opacity-50'}`}
+          title="Voice input"
         >
-          {isListening ? "🎤 Stop" : "🎤"}
+          {isListening ? "⏸️" : "🎤"}
         </button>
         <button
           onClick={handleSubmit}
           disabled={isLoading || message.trim() === ""}
-          className={`px-5 rounded-2xl text-lg font-medium min-w-[80px] border-none ${
+          className={`px-4 py-3 rounded-2xl text-lg font-medium border-none min-w-[80px] ${
             isLoading || message.trim() === ""
               ? 'bg-gray-400 text-white cursor-not-allowed'
               : 'bg-gray-900 text-white hover:bg-gray-700 cursor-pointer'
@@ -313,6 +392,7 @@ export default function ChatBox({ selectedPersonality }) {
         >
           {isLoading ? "..." : "Send"}
         </button>
+        </div>
       </div>
 
       <audio ref={audioRef} className="hidden" />

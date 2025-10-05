@@ -16,9 +16,9 @@ export default function PersonalitiesPage() {
 
   return (
     <div className="relative min-h-screen flex bg-white text-black">
-      {/* Sidebar */}
-      <aside className="w-64 bg-black text-white flex flex-col p-4 space-y-4 overflow-y-auto">  
-        <h2 className="text-2xl font-bold mb-4">Personalities</h2>
+      {/* Sidebar - Fixed with independent scroll */}
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-black text-white flex flex-col p-4 space-y-4 overflow-y-auto z-40">  
+        <h2 className="text-2xl font-bold mb-4 sticky top-0 bg-black pb-2">Personalities</h2>
         {personalities.map((p) => (
           <div
             key={p.key}
