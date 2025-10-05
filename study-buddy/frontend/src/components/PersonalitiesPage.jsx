@@ -42,9 +42,9 @@ export default function PersonalitiesPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex bg-white text-black">
+    <div className="fixed inset-0 flex bg-white text-black overflow-hidden" style={{ top: '72px' }}>
       {/* Sidebar */}
-      <aside className="w-64 bg-black text-white flex flex-col p-4 space-y-4">  
+      <aside className="w-64 bg-black text-white flex flex-col p-4 space-y-4 overflow-y-auto">  
         <h2 className="text-2xl font-bold mb-4">Personalities</h2>
         {personalities.map((p) => (
           <div
@@ -61,7 +61,7 @@ export default function PersonalitiesPage() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center relative bg-white">
+      <main className="flex-1 flex flex-col items-center justify-center relative bg-white overflow-hidden">
         {!selectedPersonality && (
           <p className="text-gray-700 text-xl">
             Select a personality to start chatting
@@ -69,10 +69,12 @@ export default function PersonalitiesPage() {
         )}
 
         {selectedPersonality && (
-          <ChatBox 
-            selectedPersonality={selectedPersonality}
-            personalities={personalities}
-          />
+          <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+            <ChatBox 
+              selectedPersonality={selectedPersonality}
+              personalities={personalities}
+            />
+          </div>
         )}
       </main>
     </div>
